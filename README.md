@@ -9,7 +9,7 @@
 
 A professional-grade competitive intelligence tool that analyzes e-commerce websites and generates executive-level reports following McKinsey/BCG/Bain consulting frameworks. Built for cross-border sellers and market researchers.
 
-![Architecture](./architecture-clean.svg)
+![Architecture](https://github.com/user-attachments/assets/78c2c453-f8b2-4444-84d8-6c8e35decbc0)
 
 ## Features
 
