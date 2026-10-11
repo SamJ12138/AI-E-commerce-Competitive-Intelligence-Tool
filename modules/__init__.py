@@ -32,7 +32,7 @@ from .business_report import BusinessReportGenerator
 try:
     from .ai_analyzer import AIAnalyzer, AIConfig, create_analyzer
     AI_AVAILABLE = True
-except ImportError:
+except ImportError:  # obs: import-time, reported by main.py in the load stage
     AI_AVAILABLE = False
 
 __all__ = [

@@ -28,6 +28,8 @@ import logging
 import statistics
 from typing import List, Optional, Dict, Any, Tuple
 
+from . import obs
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,6 +139,9 @@ def extract_prices_from_js(html_str: str) -> Dict[str, Any]:
     detected_currency = _detect_currency(html_str)
     if detected_currency:
         currency = detected_currency
+    if prices:
+        obs.note('currency', currency, 'regex' if (detected_currency or currency != 'USD') else 'default',
+                 f"price_extractor currency (detected={detected_currency!r})", stage='products')
     
     # Calculate statistics
     if prices:
@@ -148,8 +153,16 @@ def extract_prices_from_js(html_str: str) -> Dict[str, Any]:
         result['price_median'] = statistics.median(unique_prices)
         result['currency'] = currency
         result['source'] = source
-        
+
         logger.info(f"Price extraction result: min=${result['price_min']}, max=${result['price_max']}, median=${result['price_median']}, currency={currency}")
+        source_kind = {'shopify_searchSettings': 'regex', 'window_products': 'regex', 'json_ld': 'json_ld',
+                       'data_attributes': 'selector', 'inline_js': 'regex', 'meta_tags': 'selector',
+                       'html_text': 'regex'}.get(source, 'regex')
+        detail = (f"price_extractor fallback method {source!r} on homepage html; "
+                  f"{len(unique_prices)} distinct prices {unique_prices[:12]}")
+        obs.note('price_min', result['price_min'], source_kind, detail, stage='products')
+        obs.note('price_max', result['price_max'], source_kind, detail, stage='products')
+        obs.note('price_median', result['price_median'], source_kind, detail, stage='products')
     
     return result
 
@@ -179,6 +192,7 @@ def _extract_shopify_search_settings(html_str: str) -> List[float]:
             if price > 0:  # Exclude list_price:0
                 prices.append(price)
         except ValueError:
+            obs.swallowed("price_extractor.py:_extract_shopify_search_settings", error_type="parse", fallback="continue", stage="products")
             continue
     
     # Pattern 2: Try to find the entire suggestedProducts array
@@ -195,6 +209,7 @@ def _extract_shopify_search_settings(html_str: str) -> List[float]:
                 if price > 0:
                     prices.append(price)
             except ValueError:
+                obs.swallowed("price_extractor.py:_extract_shopify_search_settings", error_type="parse", fallback="continue", stage="products")
                 continue
     
     # Pattern 3: Also check for window.AloSearchSettings or similar
@@ -237,16 +252,21 @@ def _extract_window_products(html_str: str) -> List[float]:
                     data = json.loads(data_str)
                     prices.extend(_extract_prices_from_data(data))
                 except json.JSONDecodeError:
+                    obs.swallowed("price_extractor.py:_extract_window_products", error_type="parse",
+                                  fallback="regex over the JS text", stage="products", pattern=pattern)
                     # Fall back to regex extraction
                     price_pattern = r'["\']?price["\']?\s*:\s*([0-9]+(?:\.[0-9]+)?)'
                     for pm in re.findall(price_pattern, data_str):
                         try:
                             prices.append(float(pm))
                         except ValueError:
+                            obs.swallowed("price_extractor.py:_extract_window_products", error_type="parse", fallback="continue", stage="products")
                             continue
             except Exception:
+                obs.swallowed("price_extractor.py:_extract_window_products", error_type="parse",
+                              fallback="continue", stage="products", pattern=pattern)
                 continue
-    
+
     return prices
 
 
@@ -268,6 +288,7 @@ def _extract_prices_from_data(data: Any) -> List[float]:
                         if clean:
                             prices.append(float(clean))
                     except ValueError:
+                        obs.swallowed("price_extractor.py:_extract_prices_from_data", error_type="parse", fallback="pass", stage="products")
                         pass
                 elif isinstance(val, dict):
                     prices.extend(_extract_prices_from_data(val))
@@ -334,8 +355,10 @@ def _extract_jsonld_prices(html_str: str) -> Tuple[List[float], Optional[str]]:
                             currency = offers['priceCurrency']
                             
         except (json.JSONDecodeError, Exception):
+            obs.swallowed("price_extractor.py:_extract_jsonld_prices", error_type="parse",
+                          fallback="skip this ld+json block", stage="products")
             continue
-    
+
     return prices, currency
 
 
@@ -352,6 +375,7 @@ def _parse_offer_price(offer: Dict) -> Optional[float]:
                     val = float(clean)
                     return val if val > 0 else None
             except ValueError:
+                obs.swallowed("price_extractor.py:_parse_offer_price", error_type="parse", fallback="pass", stage="products")
                 pass
     return None
 
@@ -382,6 +406,7 @@ def _extract_data_attribute_prices(html_str: str) -> List[float]:
                 if price > 0:
                     prices.append(price)
             except ValueError:
+                obs.swallowed("price_extractor.py:_extract_data_attribute_prices", error_type="parse", fallback="continue", stage="products")
                 continue
     
     return prices
@@ -423,6 +448,7 @@ def _extract_inline_js_prices(html_str: str) -> List[float]:
                     if 1.0 <= price <= 50000.0:
                         prices.append(price)
                 except ValueError:
+                    obs.swallowed("price_extractor.py:_extract_inline_js_prices", error_type="parse", fallback="continue", stage="products")
                     continue
     
     return prices
@@ -452,6 +478,7 @@ def _extract_meta_prices(html_str: str) -> Tuple[List[float], Optional[str]]:
                 if price > 0:
                     prices.append(price)
             except ValueError:
+                obs.swallowed("price_extractor.py:_extract_meta_prices", error_type="parse", fallback="continue", stage="products")
                 continue
     
     # Get currency
@@ -504,6 +531,7 @@ def _extract_html_price_text(html_str: str) -> Tuple[List[float], Optional[str]]
                     if not currency:
                         currency = curr
             except ValueError:
+                obs.swallowed("price_extractor.py:_extract_html_price_text", error_type="parse", fallback="continue", stage="products")
                 continue
     
     return prices, currency

@@ -14,6 +14,7 @@ from typing import List, Dict, Optional, Tuple
 from bs4 import BeautifulSoup
 
 from .models import TrustSignal
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,9 @@ class TrustExtractor:
             for pattern in patterns:
                 if pattern in html_lower:
                     platform = name
+                    obs.note('review_platform', name, 'regex',
+                             f"REVIEW_PLATFORMS[{name!r}] substring {pattern!r} in raw html",
+                             snippet=obs.snippet(html_str, pattern))
                     break
             if platform:
                 break
@@ -154,6 +158,7 @@ class TrustExtractor:
         # Contains: "widget_title":"Join 1,000,000+ Others With Bracelets on Wrist!"
         if 'judge.me' in html_lower or 'jdgm' in html_lower:
             platform = 'Judge.me'
+            obs.note('review_platform', 'Judge.me', 'regex', "substring 'judge.me' or 'jdgm' in raw html (overrides)")
             # Try to extract review count from jdgm settings
             jdgm_match = re.search(r'window\.jdgmSettings\s*=\s*({[^;]+});', html_str)
             if jdgm_match:
@@ -164,8 +169,11 @@ class TrustExtractor:
                     count_match = re.search(r'([\d,]+)\+?\s*(others|reviews|customers)', title, re.I)
                     if count_match:
                         review_count = int(count_match.group(1).replace(',', ''))
+                        obs.note('review_count', review_count, 'json',
+                                 f"window.jdgmSettings.widget_title {title!r}")
                 except:
-                    pass
+                    obs.swallowed("trust_extractor.py:_detect_review_platform", error_type="parse",
+                                  fallback="review_count unchanged", stage="trust")
         
         # Method 2: Standard count patterns in text
         count_patterns = [
@@ -186,6 +194,8 @@ class TrustExtractor:
                     count = int(count_str)
                     if count > 0 and count < 10000000:  # Sanity check
                         review_count = count
+                        obs.note('review_count', count, 'regex',
+                                 f"count_patterns[{count_patterns.index(pattern)}] matched {match.group(0)!r} in page text")
                         break
         
         # Method 3: Check for data attributes
@@ -195,12 +205,14 @@ class TrustExtractor:
                 val = elem.get(attr)
                 if val and val.replace(',', '').isdigit():
                     review_count = int(val.replace(',', ''))
+                    obs.note('review_count', review_count, 'selector', f"[{attr}] on <{elem.name}>")
                     break
         
         # Method 4: Check script tags for jdgmSettings class
         for script in soup.select('script.jdgm-settings-script, script[class*="jdgm"]'):
             if script.string:
                 platform = 'Judge.me'
+                obs.note('review_platform', 'Judge.me', 'selector', "script.jdgm-settings-script / script[class*=jdgm]")
                 break
         
         return platform, review_count
@@ -220,10 +232,13 @@ class TrustExtractor:
         # Check both HTML and visible text
         combined = html_lower + ' ' + text
         
+        payment_evidence = {}
         for method, patterns in self.PAYMENT_METHODS.items():
             for pattern in patterns:
                 if pattern in combined:
                     methods.append(method)
+                    payment_evidence[method] = f"PAYMENT_METHODS substring {pattern!r} in html+text " \
+                        f"({obs.snippet(combined, pattern, 25)!r})"
                     break
         
         # Method 1: Parse Shopify Apple Pay capabilities JSON (like Rastaclat)
@@ -250,11 +265,14 @@ class TrustExtractor:
                         mapped = network_map.get(network.lower(), network_map.get(network))
                         if mapped and mapped not in methods:
                             methods.append(mapped)
+                            payment_evidence[mapped] = "script#apple-pay-shop-capabilities supportedNetworks"
                 if data.get('shopifyPaymentsEnabled'):
                     if 'Shop Pay' not in methods:
                         methods.append('Shop Pay')
+                        payment_evidence['Shop Pay'] = "apple-pay-shop-capabilities shopifyPaymentsEnabled"
             except:
-                pass
+                obs.swallowed("trust_extractor.py:_detect_payment_methods", error_type="parse",
+                              fallback="apple pay JSON ignored", stage="trust")
         
         # Method 2: Detect PayPal from meta tag (like Rastaclat)
         # Pattern: <meta id="in-context-paypal-metadata" ...>
@@ -262,6 +280,7 @@ class TrustExtractor:
         if paypal_meta:
             if 'PayPal' not in methods:
                 methods.append('PayPal')
+                payment_evidence['PayPal'] = "meta#in-context-paypal-metadata / meta[id*=paypal]"
             # Check for Venmo support
             if paypal_meta.get('data-venmo-supported') == 'true':
                 if 'Venmo' not in methods:
@@ -278,14 +297,19 @@ class TrustExtractor:
                     for pattern in patterns:
                         if pattern in alt or pattern in src:
                             methods.append(method)
+                            payment_evidence[method] = f"payment icon img alt/src contains {pattern!r}"
                             break
-        
+
         # Method 4: Check for Shopify dynamic checkout scripts
         if 'shopify.paymentbutton' in html_lower or 'portable-wallets' in html_lower:
             if 'Shop Pay' not in methods:
                 methods.append('Shop Pay')
-        
-        return list(set(methods))
+                payment_evidence['Shop Pay'] = "substring 'shopify.paymentbutton' or 'portable-wallets'"
+
+        methods_out = list(set(methods))
+        obs.note('payment_methods', methods_out, 'regex' if methods_out else 'default',
+                 '; '.join(f"{k}: {v}" for k, v in payment_evidence.items()) or "no payment pattern matched")
+        return methods_out
     
     def _detect_trust_badges(
         self,

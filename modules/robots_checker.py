@@ -13,6 +13,7 @@ import requests
 from robotexclusionrulesparser import RobotExclusionRulesParser
 
 from .models import Config
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +40,23 @@ class RobotsChecker:
     def _fetch_robots(self, url: str) -> Optional[RobotExclusionRulesParser]:
         """Fetch and parse robots.txt for a domain."""
         robots_url = self._get_robots_url(url)
-        
+        timer = obs.Timer()
+
         try:
             response = requests.get(
                 robots_url,
                 timeout=10,
                 headers={"User-Agent": self.user_agent}
             )
-            
+            obs.event("robots", "success" if response.status_code == 200 else "fail",
+                      duration_ms=timer.ms(),
+                      error_type=None if response.status_code == 200 else obs.classify_fetch(
+                          response.status_code, f"robots.txt status {response.status_code}"),
+                      error_message=None if response.status_code == 200 else f"robots.txt status {response.status_code}",
+                      kind="robots_fetch", url=robots_url, status=response.status_code,
+                      served_by="requests(direct, no rate limit, no cloudscraper)",
+                      bytes=len(response.content or b""))
+
             if response.status_code == 200:
                 parser = RobotExclusionRulesParser()
                 parser.parse(response.text)
@@ -54,10 +64,16 @@ class RobotsChecker:
                 return parser
             else:
                 # No robots.txt or error - assume allowed
+                obs.degraded("robots_checker.py:_fetch_robots",
+                             obs.classify_fetch(response.status_code, f"status {response.status_code}") or "http",
+                             f"robots.txt answered {response.status_code}", fallback="treat every URL as allowed",
+                             stage="robots", url=robots_url)
                 logger.debug(f"No robots.txt at {robots_url} (status {response.status_code})")
                 return None
-                
+
         except Exception as e:
+            obs.swallowed("robots_checker.py:_fetch_robots", fallback="treat every URL as allowed",
+                          stage="robots", url=robots_url)
             # Only log at debug level - SSL errors are common and not critical
             logger.debug(f"Could not fetch robots.txt from {robots_url}: {e}")
             return None
@@ -99,6 +115,7 @@ class RobotsChecker:
             allowed = parser.is_allowed("*", url)
             
             if not allowed:
+                obs.event("robots", "skip", kind="disallowed", url=url, rule_agent="*")
                 logger.info(f"URL blocked by robots.txt: {url}")
                 # Track blocked URL for evidence reporting
                 if url not in self.blocked_urls:
@@ -107,6 +124,8 @@ class RobotsChecker:
             return allowed
             
         except Exception as e:
+            obs.swallowed("robots_checker.py:is_allowed", error_type="parse", fallback="allowed",
+                          stage="robots", url=url)
             logger.warning(f"Error checking robots.txt for {url}: {e}")
             return True  # Default to allowed on error
     
@@ -142,6 +161,8 @@ class RobotsChecker:
             delay = parser.get_crawl_delay("*")
             return float(delay) if delay else None
         except Exception:
+            obs.swallowed("robots_checker.py:get_crawl_delay", error_type="parse", fallback="None",
+                          stage="robots", url=url)
             return None
     
     def get_sitemaps(self, url: str) -> list:
@@ -157,6 +178,8 @@ class RobotsChecker:
         parser = self._get_parser(url)
         
         if parser is None:
+            obs.degraded("robots_checker.py:get_sitemaps", "parse", "no parsed robots.txt",
+                         fallback="guess /sitemap.xml and /sitemap_index.xml", stage="discovery", url=url)
             # Try common sitemap locations
             parsed = urlparse(url)
             base = f"{parsed.scheme}://{parsed.netloc}"
@@ -169,4 +192,6 @@ class RobotsChecker:
             sitemaps = parser.sitemaps or []
             return list(sitemaps)
         except Exception:
+            obs.swallowed("robots_checker.py:get_sitemaps", error_type="parse", fallback="[]",
+                          stage="discovery", url=url)
             return []

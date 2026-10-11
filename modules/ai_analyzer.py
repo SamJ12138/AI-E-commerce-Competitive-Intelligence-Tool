@@ -17,13 +17,15 @@ from pathlib import Path
 
 import numpy as np
 
+from . import obs
+
 logger = logging.getLogger(__name__)
 
 # Check for optional dependencies
 try:
     import ollama
     OLLAMA_AVAILABLE = True
-except ImportError:
+except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
     OLLAMA_AVAILABLE = False
     logger.warning("Ollama not installed. Install with: pip install ollama")
 
@@ -31,14 +33,14 @@ try:
     from sklearn.ensemble import RandomForestRegressor, GradientBoostingClassifier
     from sklearn.preprocessing import StandardScaler, LabelEncoder
     SKLEARN_AVAILABLE = True
-except ImportError:
+except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
     SKLEARN_AVAILABLE = False
     logger.warning("scikit-learn not installed. Install with: pip install scikit-learn")
 
 try:
     import xgboost as xgb
     XGBOOST_AVAILABLE = True
-except ImportError:
+except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
     XGBOOST_AVAILABLE = False
     logger.warning("XGBoost not installed. Install with: pip install xgboost")
 
@@ -119,11 +121,16 @@ class OllamaClient:
             if any(self.model in name for name in model_names):
                 self._available = True
             else:
+                obs.degraded("ai_analyzer.py:OllamaClient.is_available", "external_api",
+                             f"model {self.model} not in ollama.list()", fallback="AI unavailable",
+                             stage="ai", event_name="fail", models=model_names)
                 logger.warning(f"Model {self.model} not found. Available: {model_names}")
                 logger.info(f"Pull the model with: ollama pull {self.model}")
                 self._available = False
                 
         except Exception as e:
+            obs.swallowed("ai_analyzer.py:OllamaClient.is_available", error_type="external_api",
+                          fallback="AI unavailable", stage="ai")
             logger.warning(f"Ollama not available: {e}")
             logger.info("Start Ollama with: ollama serve")
             self._available = False
@@ -160,8 +167,10 @@ class OllamaClient:
             )
             
             return response['message']['content']
-            
+
         except Exception as e:
+            obs.swallowed("ai_analyzer.py:OllamaClient.generate", error_type="external_api",
+                          fallback="None", stage="ai", model=self.model)
             logger.error(f"Ollama generation failed: {e}")
             return None
 
@@ -193,14 +202,18 @@ class ChineseInsightGenerator:
             Dictionary with 'key_insights', 'recommendations', 'analysis'
         """
         if not self.client.is_available():
+            obs.degraded("ai_analyzer.py:ChineseInsightGenerator.generate_insights", "external_api",
+                         "Ollama unavailable", fallback="template insights", stage="ai")
             return self._fallback_insights(intel_data)
-        
+
         prompt = self._build_prompt(intel_data)
         response = self.client.generate(prompt, self.SYSTEM_PROMPT)
-        
+
         if response:
             return self._parse_response(response)
         else:
+            obs.degraded("ai_analyzer.py:ChineseInsightGenerator.generate_insights", "external_api",
+                         "empty LLM response", fallback="template insights", stage="ai")
             return self._fallback_insights(intel_data)
     
     def _build_prompt(self, data: Dict) -> str:
@@ -339,6 +352,8 @@ class CompetitiveAnalyzer:
     def analyze_positioning(self, intel_data: Dict) -> str:
         """Analyze brand positioning and market strategy."""
         if not self.client.is_available():
+            obs.degraded("ai_analyzer.py:CompetitiveAnalyzer.analyze_positioning", "external_api",
+                         "Ollama unavailable", fallback="'AI分析不可用' string", stage="ai")
             return "AI分析不可用"
         
         price_min = intel_data.get('price_min') or 0
@@ -410,6 +425,8 @@ class PricingPredictor:
                     self.scaler = saved['scaler']
                 logger.info(f"Loaded pricing model from {self.model_path}")
             except Exception as e:
+                obs.swallowed("ai_analyzer.py:PricingPredictor._load_or_create_model", error_type="parse",
+                              fallback="retrain on synthetic data", stage="ai", path=str(self.model_path))
                 logger.warning(f"Could not load model: {e}")
                 self._create_default_model()
         else:
@@ -454,8 +471,10 @@ class PricingPredictor:
         
         X_scaled = self.scaler.fit_transform(X)
         self.model.fit(X_scaled, y)
-        
+
         logger.info("Pre-trained pricing model with synthetic data")
+        obs.event("ai", "success", kind="pricing_model_trained", model=type(self.model).__name__,
+                  rows=n_samples, data="synthetic (np.random.seed(42)); target is a fixed formula of the inputs")
     
     def predict_optimal_price(
         self,
@@ -479,6 +498,8 @@ class PricingPredictor:
             Tuple of (low_price, optimal_price, high_price)
         """
         if not self.model or not SKLEARN_AVAILABLE:
+            obs.degraded("ai_analyzer.py:PricingPredictor.predict_optimal_price", "unknown",
+                         "no sklearn model", fallback="competitor_price * 0.9 rule", stage="ai")
             # Simple rule-based fallback
             optimal = competitor_price * 0.9
             return (optimal * 0.85, optimal, optimal * 1.1)
@@ -699,6 +720,11 @@ class AIAnalyzer:
         self.competitive_analyzer = CompetitiveAnalyzer(self.ollama)
         self.pricing_predictor = PricingPredictor(self.config.pricing_model_path)
         self.threat_scorer = ThreatScorer()
+        obs.event("ai", "success", kind="ai_init", ollama_importable=OLLAMA_AVAILABLE,
+                  sklearn_importable=SKLEARN_AVAILABLE, xgboost_importable=XGBOOST_AVAILABLE,
+                  model=self.config.ollama_model, ollama_host_config=self.config.ollama_host,
+                  ollama_host_used="ollama module default / OLLAMA_HOST env (config value not passed)",
+                  pricing_model=type(self.pricing_predictor.model).__name__ if self.pricing_predictor.model else None)
     
     def is_ai_available(self) -> bool:
         """Check if AI features are available."""
@@ -722,10 +748,18 @@ class AIAnalyzer:
         # Generate Chinese insights
         if self.config.enable_chinese_insights:
             results['insights'] = self.insight_generator.generate_insights(intel_data)
-        
+            from_llm = 'raw_response' in results['insights']
+            obs.note('ai_insights', results['insights'].get('key_insights'), 'ai' if from_llm else 'default',
+                     f"Ollama {self.config.ollama_model} response parsed by '##' headings" if from_llm
+                     else "template fallback (_fallback_insights)", stage='ai')
+
         # Competitive positioning analysis
         if self.config.enable_competitive_analysis:
             results['positioning'] = self.competitive_analyzer.analyze_positioning(intel_data)
+            from_llm = results['positioning'] not in ("AI分析不可用", "分析失败")
+            obs.note('ai_positioning', results['positioning'], 'ai' if from_llm else 'default',
+                     f"Ollama {self.config.ollama_model} free text" if from_llm else "fixed failure string",
+                     stage='ai')
         
         # Pricing prediction
         if self.config.enable_pricing_prediction:
@@ -747,6 +781,12 @@ class AIAnalyzer:
                 'recommended_optimal': round(optimal, 2),
                 'recommended_high': round(high, 2)
             }
+            obs.note('ai_pricing', results['pricing'], 'derived',
+                     f"{type(self.pricing_predictor.model).__name__ if self.pricing_predictor.model else 'rule'} "
+                     f"fit at startup on 500 synthetic rows; inputs competitor_price={price_median} "
+                     f"({'price_median' if intel_data.get('price_median') is not None else 'price_min or default 50'}), "
+                     f"has_free_shipping read from intel_data['free_shipping_threshold'] which to_dict() never sets",
+                     stage='ai')
         
         # Threat scoring
         if self.config.enable_threat_scoring:
@@ -756,6 +796,8 @@ class AIAnalyzer:
                 'explanation': explanation,
                 'factors': factors
             }
+            obs.note('ai_threat', score, 'derived',
+                     f"ThreatScorer weighted rubric (no model): factors={factors}", stage='ai')
         
         return results
     

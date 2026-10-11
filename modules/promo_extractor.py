@@ -16,6 +16,7 @@ from typing import List, Dict, Optional, Tuple
 from bs4 import BeautifulSoup
 
 from .models import Promotion, AnalyticsPixel
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,8 @@ class PromoExtractor:
             if elem:
                 text = elem.get_text(strip=True)
                 if text and len(text) > 5:
+                    obs.note('announcement_bar', text[:500], 'selector',
+                             f"ANNOUNCEMENT_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')}>")
                     return text[:500]  # Limit length
         
         # Try to find Shopify promo slider elements (like Rastaclat)
@@ -254,6 +257,8 @@ class PromoExtractor:
                 text = tag.get_text(strip=True)
                 if text and len(text) > 5 and len(text) < 300:
                     if any(indicator in text.lower() for indicator in promo_indicators):
+                        obs.note('announcement_bar', text[:500], 'selector',
+                                 f"element whose class contains 'promo': <{slide.name} class={slide.get('class')}>")
                         return text[:500]
         
         # Try to find Shopify section containers with announcement in the ID
@@ -269,6 +274,8 @@ class PromoExtractor:
                 if text and len(text) > 5 and len(text) < 300:
                     # Check if it looks like promotional content
                     if any(indicator in text.lower() for indicator in promo_indicators):
+                        obs.note('announcement_bar', text[:500], 'selector',
+                                 f"element whose id contains 'announcement': id={section.get('id')!r}")
                         return text[:500]
         
         # Also check for fixed top elements
@@ -280,6 +287,7 @@ class PromoExtractor:
                 if text and len(text) > 10 and len(text) < 200:
                     # Check if it looks like a promo
                     if any(word in text.lower() for word in promo_indicators):
+                        obs.note('announcement_bar', text, 'selector', "first child element of <header>")
                         return text
         
         # Check for marquee/ticker elements which often contain promotions
@@ -289,8 +297,10 @@ class PromoExtractor:
             if marquee:
                 text = marquee.get_text(strip=True)
                 if text and len(text) > 5:
+                    obs.note('announcement_bar', text[:500], 'selector', f"marquee selector {selector!r}")
                     return text[:500]
-        
+
+        obs.note('announcement_bar', '', 'default', "no announcement selector matched")
         return ''
     
     def _detect_popup(self, soup: BeautifulSoup, html_str: str) -> bool:
@@ -298,8 +308,11 @@ class PromoExtractor:
         # Check for popup elements
         for selector in self.POPUP_SELECTORS:
             if soup.select_one(selector):
+                elem = soup.select_one(selector)
+                obs.note('has_popup', True, 'selector',
+                         f"POPUP_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')} id={elem.get('id')}>")
                 return True
-        
+
         # Check for common popup libraries in scripts
         popup_libs = [
             'klaviyo', 'privy', 'justuno', 'wheelio', 'optinmonster',
@@ -307,60 +320,79 @@ class PromoExtractor:
         ]
         for lib in popup_libs:
             if lib in html_str.lower():
+                obs.note('has_popup', True, 'regex', f"popup library substring {lib!r} in raw html",
+                         snippet=obs.snippet(html_str, lib))
                 return True
-        
+
+        obs.note('has_popup', False, 'default', "no POPUP_SELECTORS or popup library substring matched")
         return False
     
     def _detect_email_capture(self, soup: BeautifulSoup) -> bool:
         """Detect email capture forms."""
         for selector in self.EMAIL_CAPTURE_SELECTORS:
             if soup.select_one(selector):
+                elem = soup.select_one(selector)
+                obs.note('has_email_capture', True, 'selector',
+                         f"EMAIL_CAPTURE_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')} id={elem.get('id')}>")
                 return True
-        
+
         # Check for email input fields
         email_inputs = soup.find_all('input', {'type': 'email'})
         if email_inputs:
+            obs.note('has_email_capture', True, 'selector', "input[type=email]")
             return True
-        
+
         # Check for newsletter-related text near forms
         forms = soup.find_all('form')
         for form in forms:
             text = form.get_text().lower()
             if any(word in text for word in ['newsletter', 'subscribe', 'signup', 'join']):
+                obs.note('has_email_capture', True, 'regex', "form text contains newsletter/subscribe/signup/join")
                 return True
-        
+
+        obs.note('has_email_capture', False, 'default', "no email capture selector, email input or form keyword")
         return False
     
     def _detect_loyalty(self, soup: BeautifulSoup, html_str: str) -> bool:
         """Detect loyalty program indicators."""
         text_lower = soup.get_text().lower()
-        
+
         for keyword in self.LOYALTY_KEYWORDS:
             if keyword in text_lower:
+                obs.note('has_loyalty', True, 'regex', f"LOYALTY_KEYWORDS substring {keyword!r} in page text",
+                         snippet=obs.snippet(text_lower, keyword))
                 return True
-        
+
         # Check for loyalty platform scripts
         loyalty_platforms = ['smile.io', 'yotpo', 'loyaltylion', 'stamped.io/widget/loyalty']
         for platform in loyalty_platforms:
             if platform in html_str.lower():
+                obs.note('has_loyalty', True, 'regex', f"loyalty platform substring {platform!r} in raw html",
+                         snippet=obs.snippet(html_str, platform))
                 return True
-        
+
+        obs.note('has_loyalty', False, 'default', "no LOYALTY_KEYWORDS or loyalty platform substring")
         return False
     
     def _detect_referral(self, soup: BeautifulSoup, html_str: str) -> bool:
         """Detect referral program indicators."""
         text_lower = soup.get_text().lower()
-        
+
         for keyword in self.REFERRAL_KEYWORDS:
             if keyword in text_lower:
+                obs.note('has_referral', True, 'regex', f"REFERRAL_KEYWORDS substring {keyword!r} in page text",
+                         snippet=obs.snippet(text_lower, keyword))
                 return True
-        
+
         # Check for referral platform scripts
         referral_platforms = ['referralcandy', 'friendbuy', 'talkable', 'extole']
         for platform in referral_platforms:
             if platform in html_str.lower():
+                obs.note('has_referral', True, 'regex', f"referral platform substring {platform!r} in raw html",
+                         snippet=obs.snippet(html_str, platform))
                 return True
-        
+
+        obs.note('has_referral', False, 'default', "no REFERRAL_KEYWORDS or referral platform substring")
         return False
     
     def _extract_free_shipping(
@@ -400,7 +432,10 @@ class PromoExtractor:
                     description=match.group(0),
                     value=f"${threshold}" if threshold else "All orders"
                 )
-                
+
+                obs.note('free_shipping_threshold', threshold, 'regex',
+                         f"promo_extractor.FREE_SHIPPING_PATTERNS[{self.FREE_SHIPPING_PATTERNS.index(pattern)}] "
+                         f"matched {match.group(0)!r} in page text")
                 return threshold, promo
         
         return None, None
@@ -497,6 +532,12 @@ class PromoExtractor:
             r'G-[A-Z0-9]+',
         ]
         ga_detected = any(re.search(p, html_str, re.IGNORECASE) for p in ga_patterns)
+        pixel_evidence = {}
+        if ga_detected:
+            ga_hit = next(p for p in ga_patterns if re.search(p, html_str, re.IGNORECASE))
+            ga_text = re.search(ga_hit, html_str, re.IGNORECASE).group(0)
+            pixel_evidence['Google Analytics'] = f"pattern {ga_hit!r} (IGNORECASE) matched {ga_text!r}: " \
+                f"{obs.snippet(html_str, ga_text, 30)!r}"
         
         # Try to extract GA ID
         ga_id = None
@@ -518,6 +559,9 @@ class PromoExtractor:
             r'pixel_id',
         ]
         meta_detected = any(re.search(p, html_str, re.IGNORECASE) for p in meta_patterns)
+        if meta_detected:
+            meta_hit = next(p for p in meta_patterns if re.search(p, html_str, re.IGNORECASE))
+            pixel_evidence['Meta Pixel'] = f"pattern {meta_hit!r} matched {re.search(meta_hit, html_str, re.IGNORECASE).group(0)!r}"
         
         meta_id = None
         meta_match = re.search(r'fbq\s*\(\s*[\'"]init[\'"]\s*,\s*[\'"](\d+)[\'"]', html_str)
@@ -537,6 +581,9 @@ class PromoExtractor:
             r'tiktok.*pixel',
         ]
         tiktok_detected = any(re.search(p, html_str, re.IGNORECASE) for p in tiktok_patterns)
+        if tiktok_detected:
+            tt_hit = next(p for p in tiktok_patterns if re.search(p, html_str, re.IGNORECASE))
+            pixel_evidence['TikTok Pixel'] = f"pattern {tt_hit!r} matched {re.search(tt_hit, html_str, re.IGNORECASE).group(0)!r}"
         pixels.append(AnalyticsPixel(
             name='TikTok Pixel',
             detected=tiktok_detected
@@ -569,7 +616,16 @@ class PromoExtractor:
             name='Klaviyo',
             detected=klaviyo_detected
         ))
-        
+
+        for flag, name, needle in ((pinterest_detected, 'Pinterest Tag', 'pintrk|pinterest.com/v3'),
+                                   (snap_detected, 'Snapchat Pixel', 'sc-static.net/scevent|snaptr'),
+                                   (bing_detected, 'Microsoft Ads', 'bat.bing.com|uetq'),
+                                   (klaviyo_detected, 'Klaviyo', 'klaviyo')):
+            if flag:
+                pixel_evidence[name] = f"substring {needle!r} in raw html"
+        detected_names = [p.name for p in pixels if p.detected]
+        obs.note('pixels_detected', detected_names, 'regex' if detected_names else 'default',
+                 '; '.join(f"{k}: {v}" for k, v in pixel_evidence.items()) or "no pixel pattern matched")
         return pixels
 
 

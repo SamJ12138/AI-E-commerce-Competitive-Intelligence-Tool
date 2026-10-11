@@ -12,6 +12,8 @@ from urllib.parse import urlparse, urljoin, urlunparse, parse_qs, urlencode
 
 import tldextract
 
+from . import obs
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +82,8 @@ def normalize_url(url: str) -> str:
         return normalized
         
     except Exception as e:
+        obs.swallowed("url_utils.py:normalize_url", error_type="input_invalid", fallback="URL returned as given",
+                      url=url)
         logger.warning(f"URL normalization failed for {url}: {e}")
         return url
 
@@ -100,8 +104,12 @@ def extract_domain(url: str) -> str:
         extracted = tldextract.extract(url)
         if extracted.suffix:
             return f"{extracted.domain}.{extracted.suffix}"
+        obs.degraded("url_utils.py:extract_domain", "input_invalid",
+                     "no public suffix (IP address or local host): port and subdomain dropped",
+                     fallback=f"domain={extracted.domain!r}", event_name="skip", url=url)
         return extracted.domain
     except Exception:
+        obs.swallowed("url_utils.py:extract_domain", error_type="input_invalid", fallback="netloc parse", url=url)
         # Fallback to simple parsing
         parsed = urlparse(url)
         return parsed.netloc.lower().replace('www.', '')
@@ -121,6 +129,7 @@ def extract_full_domain(url: str) -> str:
         parsed = urlparse(url)
         return parsed.netloc.lower()
     except Exception:
+        obs.swallowed("url_utils.py:extract_full_domain", error_type="input_invalid", fallback="url", url=url)
         return url
 
 
@@ -220,6 +229,7 @@ def is_valid_url(url: str) -> bool:
             '.' in result.netloc  # Has TLD
         ])
     except Exception:
+        obs.swallowed("url_utils.py:is_valid_url", error_type="input_invalid", fallback="False", url=url)
         return False
 
 

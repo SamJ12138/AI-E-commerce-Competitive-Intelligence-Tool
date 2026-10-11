@@ -35,7 +35,7 @@ try:
     PLAYWRIGHT_AVAILABLE = True
     BROWSER_ENGINE = "patchright"
     logger_msg = "Patchright (anti-bot) available"
-except ImportError:
+except ImportError:  # obs: import-time, reported by HttpClient.__init__
     PATCHRIGHT_AVAILABLE = False
     # Fallback to standard Playwright
     try:
@@ -43,7 +43,7 @@ except ImportError:
         PLAYWRIGHT_AVAILABLE = True
         BROWSER_ENGINE = "playwright"
         logger_msg = "Playwright available (consider installing patchright for better bot bypass)"
-    except ImportError:
+    except ImportError:  # obs: import-time, reported by HttpClient.__init__
         PLAYWRIGHT_AVAILABLE = False
         BROWSER_ENGINE = None
         logger_msg = "No browser automation available"
@@ -52,10 +52,11 @@ except ImportError:
 try:
     import cloudscraper
     CLOUDSCRAPER_AVAILABLE = True
-except ImportError:
+except ImportError:  # obs: import-time, reported by HttpClient.__init__
     CLOUDSCRAPER_AVAILABLE = False
 
 from .models import Config
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +115,25 @@ class HttpClient:
         self._playwright = None
         self._browser = None
         self._context = None
+        self._served_by_override = None
         
         # Log which browser engine is being used
         if BROWSER_ENGINE:
             logger.info(f"Browser engine: {BROWSER_ENGINE}")
         if CLOUDSCRAPER_AVAILABLE:
             logger.info("Cloudscraper available for Cloudflare bypass")
+        obs.event("fetch", "success", kind="client_init", browser_engine=BROWSER_ENGINE,
+                  patchright_available=PATCHRIGHT_AVAILABLE, playwright_available=PLAYWRIGHT_AVAILABLE,
+                  cloudscraper_available=CLOUDSCRAPER_AVAILABLE,
+                  cloudscraper_session=self.cloudscraper_session is not None,
+                  render_js=config.render_js, rate_limit_delay=config.rate_limit_delay)
+        if not PATCHRIGHT_AVAILABLE:
+            obs.degraded("http_client.py:<import>", "unknown",
+                         "patchright not importable", fallback=f"browser engine = {BROWSER_ENGINE}",
+                         stage="fetch")
+        if not CLOUDSCRAPER_AVAILABLE:
+            obs.degraded("http_client.py:<import>", "unknown",
+                         "cloudscraper not importable", fallback="no cloudscraper branch", stage="fetch")
     
     def _create_cloudscraper(self):
         """Create a cloudscraper session for Cloudflare bypass."""
@@ -133,6 +147,8 @@ class HttpClient:
             )
             return scraper
         except Exception as e:
+            obs.swallowed("http_client.py:_create_cloudscraper", fallback="cloudscraper_session=None",
+                          stage="fetch")
             logger.warning(f"Failed to create cloudscraper: {e}")
             return None
     
@@ -205,8 +221,11 @@ class HttpClient:
                     args=launch_args
                 )
                 logger.info(f"Browser initialized: Chrome via {BROWSER_ENGINE}")
+                obs.event("fetch", "success", kind="browser_init", channel="chrome", engine=BROWSER_ENGINE)
             except Exception as e:
                 # Fallback to Chromium
+                obs.swallowed("http_client.py:_init_playwright", fallback="bundled Chromium",
+                              stage="fetch")
                 logger.warning(f"Chrome not available, using Chromium: {e}")
                 self._browser = self._playwright.chromium.launch(
                     headless=True,
@@ -294,38 +313,76 @@ class HttpClient:
         is_protected = any(site in domain for site in self.PROTECTED_SITES)
         
         # Apply rate limiting
+        timer = obs.Timer()
         self.rate_limiter.wait(domain)
-        
+        wait_ms = timer.ms()
+        chain = []
+
         if use_js:
-            result = self._fetch_with_playwright(url)
-            
+            result = self._attempt('browser', self._fetch_with_playwright, url, chain)
+
             # If failed (403 or error), try fallback strategies
             if result[1] == 403 or result[3]:
                 logger.info(f"Browser fetch failed for {domain}, trying fallbacks...")
-                
+
                 # Fallback 1: Try cloudscraper for Cloudflare bypass
                 if CLOUDSCRAPER_AVAILABLE and self.cloudscraper_session:
                     logger.info(f"Trying cloudscraper for {domain}")
-                    result = self._fetch_with_cloudscraper(url)
+                    result = self._attempt('cloudscraper', self._fetch_with_cloudscraper, url, chain)
                     if result[0] and not result[3]:
+                        self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
                         return result
-                
+
                 # Fallback 2: For protected sites, return placeholder
                 if is_protected:
                     logger.info(f"Protected site {domain}, returning placeholder")
-                    result = self._fetch_protected_site(url)
-            
+                    result = self._attempt('placeholder', self._fetch_protected_site, url, chain)
+
+            self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
             return result
         else:
             # Try regular requests first
-            result = self._fetch_with_requests(url)
-            
+            result = self._attempt('requests', self._fetch_with_requests, url, chain)
+
             # If 403, try cloudscraper
             if result[1] == 403 and CLOUDSCRAPER_AVAILABLE and self.cloudscraper_session:
                 logger.info(f"Requests got 403, trying cloudscraper for {domain}")
-                result = self._fetch_with_cloudscraper(url)
-            
+                result = self._attempt('cloudscraper', self._fetch_with_cloudscraper, url, chain)
+
+            self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
             return result
+
+    def _attempt(self, branch: str, fn, url: str, chain: list):
+        """Run one fetch branch and append what it returned to chain (logging only)."""
+        timer = obs.Timer()
+        self._served_by_override = None
+        result = fn(url)
+        html, status, headers, error = result
+        chain.append({
+            'branch': branch,
+            'served_by': self._served_by_override or branch,
+            'status': status,
+            'bytes': len(html.encode('utf-8', 'replace')) if html else 0,
+            'error': error,
+            'duration_ms': round(timer.ms(), 2),
+        })
+        return result
+
+    def _log_fetch(self, url, result, chain, use_js, is_protected, wait_ms, timer) -> None:
+        """One 'fetch' event per fetch() call: which branch served it, status, bytes."""
+        html, status, headers, error = result
+        last = chain[-1] if chain else {}
+        obs.event(
+            "fetch", "success" if (html and not error) else "fail",
+            duration_ms=timer.ms(),
+            error_type=obs.classify_fetch(status, error) if error else (None if html else "http"),
+            error_message=error if error else (None if html else "Empty response"),
+            url=url, status=status, served_by=last.get('served_by'),
+            bytes=last.get('bytes', 0), chain=chain, render_js=use_js,
+            protected_site=is_protected, rate_limit_wait_ms=round(wait_ms, 2),
+            caller_stage=obs.current_stage(),
+            server_header=(headers or {}).get('Server') or (headers or {}).get('server'),
+        )
     
     def _fetch_with_cloudscraper(
         self,
@@ -349,8 +406,10 @@ class HttpClient:
             response.encoding = response.apparent_encoding or 'utf-8'
             logger.info(f"Cloudscraper succeeded for {url}")
             return response.text, response.status_code, headers, None
-            
+
         except Exception as e:
+            obs.swallowed("http_client.py:_fetch_with_cloudscraper", fallback="returned (None, 0, {}, error)",
+                          stage="fetch", url=url)
             # Only log at debug level for common SSL errors
             error_str = str(e)
             if 'SSL' in error_str or 'timeout' in error_str.lower():
@@ -372,6 +431,9 @@ class HttpClient:
         
         # Create a placeholder response explaining the limitation
         logger.warning(f"Site {domain} has strong bot protection - limited data available")
+        obs.degraded("http_client.py:_fetch_protected_site", "blocked",
+                     "PROTECTED_SITES match: synthetic placeholder HTML returned with status 200",
+                     fallback="placeholder page", stage="fetch", event_name="fail", url=url)
         
         # Return a minimal HTML response that explains the situation
         # This allows the tool to continue without crashing
@@ -425,6 +487,8 @@ class HttpClient:
             return response.text, response.status_code, headers, None
             
         except requests.exceptions.SSLError as e:
+            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+                          fallback="retry with verify=False", stage="fetch", url=url)
             logger.debug(f"SSL error for {url}, retrying without verification")
             try:
                 with warnings.catch_warnings():
@@ -437,15 +501,23 @@ class HttpClient:
                     )
                 return response.text, response.status_code, dict(response.headers), None
             except Exception as e2:
+                obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+                              fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
                 return None, 0, {}, f"SSL error: {str(e2)}"
-                
+
         except requests.exceptions.Timeout:
+            obs.swallowed("http_client.py:_fetch_with_requests", error_type="timeout",
+                          fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Timeout after {self.config.timeout}s"
-            
+
         except requests.exceptions.ConnectionError as e:
+            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+                          fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Connection error: {str(e)}"
-            
+
         except requests.exceptions.RequestException as e:
+            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+                          fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Request error: {str(e)}"
     
     def _fetch_with_playwright(
@@ -474,6 +546,8 @@ class HttpClient:
                     # Additional wait for dynamic content
                     page.wait_for_timeout(3000)
                 except:
+                    obs.swallowed("http_client.py:_fetch_with_playwright", fallback="wait 2s and read the page anyway",
+                                  stage="fetch", url=url)
                     # If selector wait fails, just continue
                     page.wait_for_timeout(2000)
                 
@@ -489,13 +563,20 @@ class HttpClient:
                 page.close()
                 
         except PlaywrightTimeout:
+            obs.swallowed("http_client.py:_fetch_with_playwright", error_type="timeout",
+                          fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Playwright timeout after 60s"
         except Exception as e:
             error_msg = str(e)
             # Handle HTTP/2 protocol errors by falling back to requests
             if any(err in error_msg for err in ['HTTP2_PROTOCOL_ERROR', 'ERR_HTTP2', 'net::ERR_']):
+                obs.swallowed("http_client.py:_fetch_with_playwright", error_type="http",
+                              fallback="plain requests fetch", stage="fetch", url=url)
                 logger.debug(f"Playwright network error for {url}, using fallback")
+                self._served_by_override = 'browser->requests'
                 return self._fetch_with_requests(url)
+            obs.swallowed("http_client.py:_fetch_with_playwright",
+                          fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Playwright error: {error_msg}"
     
     def fetch_and_parse(
@@ -515,6 +596,9 @@ class HttpClient:
             return None, status, error
         
         if not html:
+            obs.degraded("http_client.py:fetch_and_parse", "http", "empty body with no error",
+                         fallback="returned (None, status, 'Empty response')", stage="fetch",
+                         event_name="fail", url=url, status=status)
             return None, status, "Empty response"
         
         try:
@@ -522,11 +606,15 @@ class HttpClient:
             try:
                 soup = BeautifulSoup(html, 'lxml')
             except Exception:
+                obs.swallowed("http_client.py:fetch_and_parse", error_type="parse",
+                              fallback="html.parser", stage="fetch", url=url)
                 soup = BeautifulSoup(html, 'html.parser')
-            
+
             return soup, status, None
-            
+
         except Exception as e:
+            obs.swallowed("http_client.py:fetch_and_parse", error_type="parse",
+                          fallback="returned (None, status, error)", stage="fetch", url=url)
             return None, status, f"HTML parsing error: {str(e)}"
     
     def head(self, url: str) -> Tuple[int, Dict[str, str], Optional[str]]:
@@ -547,4 +635,5 @@ class HttpClient:
             )
             return response.status_code, dict(response.headers), None
         except Exception as e:
+            obs.swallowed("http_client.py:head", fallback="returned (0, {}, error)", stage="fetch", url=url)
             return 0, {}, str(e)

@@ -17,6 +17,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from bs4 import BeautifulSoup
 
 from .models import Product, PriceInfo, Platform
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,10 @@ class ProductExtractor:
         
         # Fall back to generic extraction
         if not products:
+            if self.platform in (Platform.SHOPIFY, Platform.WOOCOMMERCE, Platform.BIGCOMMERCE):
+                obs.degraded("product_extractor.py:extract_from_page", "parse",
+                             f"{self.platform.value} extractor found no products",
+                             fallback="_extract_generic", stage="products", url=url)
             products = self._extract_generic(soup, url)
         
         # Deduplicate by URL
@@ -111,7 +116,7 @@ class ProductExtractor:
                     continue
                 
                 data = json.loads(text)
-                
+
                 # Look for product data in various structures
                 if isinstance(data, dict):
                     if 'product' in data:
@@ -131,8 +136,10 @@ class ProductExtractor:
                                     p = self._parse_shopify_product(prod_data, url)
                                     if p:
                                         products.append(p)
-                                
+
             except (json.JSONDecodeError, Exception):
+                obs.swallowed("product_extractor.py:_extract_shopify", error_type="parse",
+                              fallback="skip this application/json script", stage="products", url=url)
                 continue
         
         # Method 2: Look for inline product JSON in script tags
@@ -159,7 +166,9 @@ class ProductExtractor:
                                 if p:
                                     products.append(p)
                     except:
-                        pass
+                        obs.swallowed("product_extractor.py:_extract_shopify", error_type="parse",
+                                      fallback="ignore inline product array", stage="products", url=url,
+                                      pattern=pattern)
         
         # Method 3: Extract from Shopify meta tags and structured data
         for script in soup.find_all('script', type='application/ld+json'):
@@ -175,8 +184,13 @@ class ProductExtractor:
                             p = self._parse_structured_data_product(item, url)
                             if p:
                                 products.append(p)
+                elif isinstance(data, dict) and '@graph' in data:
+                    obs.degraded("product_extractor.py:_extract_shopify", "parse",
+                                 "JSON-LD @graph is not searched for Product nodes",
+                                 fallback="ignored", stage="products", event_name="fail", url=url)
             except:
-                pass
+                obs.swallowed("product_extractor.py:_extract_shopify", error_type="parse",
+                              fallback="ignore this ld+json script", stage="products", url=url)
         
         # Method 4: Try product card patterns (expanded selectors for modern themes)
         # Modern Shopify themes like Impact use custom elements like <product-card>
@@ -239,14 +253,20 @@ class ProductExtractor:
             image_url = data.get('image')
             if isinstance(image_url, list):
                 image_url = image_url[0] if image_url else None
-            
-            return Product(
+
+            product = Product(
                 title=title,
                 url=product_url,
                 price=price_info,
                 image_url=image_url
             )
+            product._obs = {'source': 'json_ld',
+                            'detail': f"JSON-LD Product offers.price={offers.get('price') if offers else None!r} "
+                                      f"(compare-at not read)"}
+            return product
         except Exception as e:
+            obs.swallowed("product_extractor.py:_parse_structured_data_product", error_type="parse",
+                          fallback="None", stage="products")
             logger.debug(f"Error parsing structured data product: {e}")
             return None
     
@@ -279,6 +299,7 @@ class ProductExtractor:
                 first_variant = variants[0]
                 price = first_variant.get('price')
                 compare_at = first_variant.get('compare_at_price')
+                raw_price, raw_compare = price, compare_at
                 
                 if price:
                     # Shopify prices are in cents
@@ -320,7 +341,7 @@ class ProductExtractor:
                 for kw in self.SUBSCRIPTION_KEYWORDS
             )
             
-            return Product(
+            product = Product(
                 title=title,
                 url=product_url,
                 price=price_info,
@@ -329,8 +350,16 @@ class ProductExtractor:
                 is_bundle=is_bundle,
                 is_subscription=is_subscription,
             )
-            
+            product._obs = {'source': 'json',
+                            'detail': (f"Shopify product JSON variants[0] price={raw_price!r} "
+                                       f"compare_at_price={raw_compare!r} (int >100 treated as cents; "
+                                       f"compare-at only read when int/float)") if variants else
+                                      "Shopify product JSON without variants"}
+            return product
+
         except Exception as e:
+            obs.swallowed("product_extractor.py:_parse_shopify_product", error_type="parse",
+                          fallback="None", stage="products")
             logger.debug(f"Error parsing Shopify product: {e}")
             return None
     
@@ -421,10 +450,12 @@ class ProductExtractor:
                 '.h6', '.product-card__info .h6', 
                 '.product__name', '.product-item__title',
             ]
+            title_via = None
             for selector in title_selectors:
                 title_elem = element.select_one(selector)
                 if title_elem:
                     title = title_elem.get_text(strip=True)
+                    title_via = selector
                     if title and len(title) > 2:
                         break
             
@@ -438,6 +469,7 @@ class ProductExtractor:
                         link_text = link.get_text(strip=True)
                         if link_text and len(link_text) > 2 and len(link_text) < 200:
                             title = link_text
+                            title_via = "a[href*='/products/'] text"
                             break
             
             if not title or len(title) < 2:
@@ -480,7 +512,7 @@ class ProductExtractor:
             is_bundle = any(kw in text for kw in self.BUNDLE_KEYWORDS)
             is_subscription = any(kw in text for kw in self.SUBSCRIPTION_KEYWORDS)
             
-            return Product(
+            product = Product(
                 title=title[:200],  # Limit title length
                 url=product_url,
                 price=price_info,
@@ -488,8 +520,14 @@ class ProductExtractor:
                 is_bundle=is_bundle,
                 is_subscription=is_subscription,
             )
-            
+            product._obs = {'source': 'selector',
+                            'detail': f"card <{element.name} class={element.get('class')}>; title via {title_via!r}; "
+                                      f"price {getattr(price_info, '_obs', 'none found')}"}
+            return product
+
         except Exception as e:
+            obs.swallowed("product_extractor.py:_parse_product_card", error_type="parse",
+                          fallback="None", stage="products")
             logger.debug(f"Error parsing product card: {e}")
             return None
     
@@ -522,7 +560,9 @@ class ProductExtractor:
             
             price_text = None
             compare_text = None
-            
+            price_via = None
+            compare_via = None
+
             # Look for current price
             for selector in price_selectors:
                 price_elem = element.select_one(selector)
@@ -532,15 +572,17 @@ class ProductExtractor:
                     if sr_only:
                         sr_only.decompose()
                     price_text = price_elem.get_text(strip=True)
+                    price_via = selector
                     if price_text and '$' in price_text:
                         break
-            
+
             # If still no price, try looking for any element with $ symbol
             if not price_text:
                 all_text = element.get_text()
                 price_match = re.search(r'\$[\d,.]+', all_text)
                 if price_match:
                     price_text = price_match.group()
+                    price_via = "first \\$[\\d,.]+ in card text"
             
             # Look for compare-at price
             compare_selectors = [
@@ -555,6 +597,7 @@ class ProductExtractor:
                 compare_elem = element.select_one(selector)
                 if compare_elem:
                     compare_text = compare_elem.get_text(strip=True)
+                    compare_via = selector
                     break
             
             if not price_text:
@@ -576,15 +619,20 @@ class ProductExtractor:
             if is_on_sale:
                 discount_percent = round((1 - current_price / compare_price) * 100)
             
-            return PriceInfo(
+            price_info = PriceInfo(
                 currency=currency or 'USD',
                 current_price=current_price,
                 compare_at_price=compare_price,
                 is_on_sale=is_on_sale,
                 discount_percent=discount_percent
             )
-            
+            price_info._obs = (f"price via {price_via!r} text {price_text[:80]!r} -> {current_price}; "
+                               f"compare via {compare_via!r} text {(compare_text or '')[:80]!r} -> {compare_price}")
+            return price_info
+
         except Exception:
+            obs.swallowed("product_extractor.py:_extract_price_from_element", error_type="parse",
+                          fallback="None (no price)", stage="products")
             return None
     
     def _parse_price_string(
@@ -632,6 +680,7 @@ class ProductExtractor:
             try:
                 return float(price_str), currency
             except ValueError:
+                obs.swallowed("product_extractor.py:_parse_price_string", error_type="parse", fallback="pass", stage="products")
                 pass
         
         return None, currency

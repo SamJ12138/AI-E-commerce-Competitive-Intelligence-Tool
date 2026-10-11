@@ -11,6 +11,7 @@ from typing import Tuple, List, Dict, Optional
 from bs4 import BeautifulSoup
 
 from .models import Platform
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +242,12 @@ class PlatformDetector:
             confidence = 0.6
         else:
             confidence = 0.0
-        
+
+        obs.note('platform', best_platform.value, 'regex' if best_signals else 'default',
+                 detail='; '.join(best_signals) if best_signals else 'no platform signal matched; Platform.CUSTOM',
+                 confidence=confidence,
+                 signal_counts={p.value: len(s) for p, s in scores.items() if s},
+                 tie_broken_by_enum_order=sum(1 for s in scores.values() if len(s) == best_score and best_score) > 1)
         return best_platform, confidence, best_signals
     
     def _check_shopify_specific(

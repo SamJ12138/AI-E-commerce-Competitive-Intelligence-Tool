@@ -14,6 +14,7 @@ from typing import Optional, List, Tuple
 from bs4 import BeautifulSoup
 
 from .models import ShippingPolicy, ReturnPolicy
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,9 @@ class PolicyExtractor:
                 if re.search(pattern, text, re.IGNORECASE):
                     regions.append(region)
                     break
-        
+
+        if not regions:
+            obs.note('shipping_regions', ['United States'], 'default', "no region pattern matched")
         return list(set(regions)) if regions else ['United States']
     
     def _extract_free_shipping_threshold(self, text: str) -> Optional[float]:
@@ -152,12 +155,17 @@ class PolicyExtractor:
                 # Find the numeric group
                 for group in match.groups():
                     if group and group.isdigit():
+                        obs.note('free_shipping_threshold', float(group), 'regex',
+                                 f"policy_extractor.FREE_SHIPPING_PATTERNS[{self.FREE_SHIPPING_PATTERNS.index(pattern)}] "
+                                 f"matched {match.group(0)!r}")
                         return float(group)
-        
+
         # Check for "free shipping on all orders"
         if re.search(r'free\s+shipping\s+on\s+all\s+orders', text, re.IGNORECASE):
+            obs.note('free_shipping_threshold', 0.0, 'regex', "'free shipping on all orders' -> 0.0")
             return 0.0
-        
+
+        obs.note('free_shipping_threshold', None, 'default', "no FREE_SHIPPING_PATTERNS matched on this page")
         return None
     
     def _extract_delivery_times(self, text: str) -> Tuple[Optional[int], Optional[int]]:
@@ -182,8 +190,12 @@ class PolicyExtractor:
             if match:
                 for group in match.groups():
                     if group and group.isdigit():
+                        obs.note('return_days', int(group), 'regex',
+                                 f"policy_extractor.RETURN_DAYS_PATTERNS[{self.RETURN_DAYS_PATTERNS.index(pattern)}] "
+                                 f"matched {match.group(0)!r}")
                         return int(group)
-        
+
+        obs.note('return_days', None, 'default', "no RETURN_DAYS_PATTERNS matched on this page")
         return None
     
     def _check_free_returns(self, text: str) -> bool:
@@ -198,8 +210,11 @@ class PolicyExtractor:
         
         for pattern in free_return_patterns:
             if re.search(pattern, text, re.IGNORECASE):
+                obs.note('free_returns', True, 'regex',
+                         f"free_return_patterns {pattern!r} matched {re.search(pattern, text, re.IGNORECASE).group(0)!r}")
                 return True
-        
+
+        obs.note('free_returns', False, 'default', "no free_return_patterns matched on this page")
         return False
     
     def _extract_return_conditions(self, text: str) -> List[str]:
@@ -342,12 +357,15 @@ def extract_policies(
         'return', 'refund', 'exchange', 'money back'
     ])
     
+    obs.event("policies", "success", kind="policy_page_classified", page_type=page_type,
+              has_shipping_content=has_shipping_content, has_return_content=has_return_content)
+
     if has_shipping_content or page_type == 'shipping':
         shipping = extractor.extract_shipping_policy(soup, page_text)
-    
+
     if has_return_content or page_type == 'return':
         returns = extractor.extract_return_policy(soup, page_text)
-    
+
     return shipping, returns
 
 
@@ -378,9 +396,15 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
     if 'free shipping' in html_lower and 'free returns' in html_lower:
         result['free_returns'] = True
         result['has_free_shipping'] = True
+        obs.note('free_returns', True, 'regex',
+                 "homepage JS fallback pattern 1: 'free shipping' and 'free returns' both anywhere in raw html",
+                 stage='policies')
         # If both are mentioned together without threshold, likely free on all orders
         if not re.search(r'free\s+shipping\s+(?:over|on\s+orders?\s+over)\s+\$?\d+', html_lower):
             result['free_shipping_threshold'] = 0
+            obs.note('free_shipping_threshold', 0, 'regex',
+                     "homepage JS fallback pattern 1: both phrases present and no 'over $N' -> 0 (free on all orders)",
+                     stage='policies')
     
     # Pattern 2: Free shipping threshold from various patterns
     threshold_patterns = [
@@ -395,6 +419,9 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
         if match:
             result['free_shipping_threshold'] = float(match.group(1))
             result['has_free_shipping'] = True
+            obs.note('free_shipping_threshold', float(match.group(1)), 'regex',
+                     f"homepage JS fallback threshold_patterns[{threshold_patterns.index(pattern)}] "
+                     f"matched {match.group(0)[:80]!r} in raw html", stage='policies')
             break
     
     # Pattern 3: Return days from embedded text or JSON
@@ -410,6 +437,9 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
         match = re.search(pattern, html_str, re.I)
         if match:
             result['return_days'] = int(match.group(1))
+            obs.note('return_days', int(match.group(1)), 'regex',
+                     f"homepage JS fallback return_patterns[{return_patterns.index(pattern)}] "
+                     f"matched {match.group(0)[:120]!r} in raw html", stage='policies')
             break
     
     # Pattern 4: Shipping options from Shopify JSON
@@ -426,8 +456,11 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
                 result['has_free_shipping'] = True
                 if result['free_shipping_threshold'] is None:
                     result['free_shipping_threshold'] = 0
+                    obs.note('free_shipping_threshold', 0, 'regex',
+                             "homepage JS fallback: sddShippingOptions mentions 'free' -> 0", stage='policies')
         except:
-            pass
+            obs.swallowed("policy_extractor.py:extract_policies_from_homepage_js", error_type="parse",
+                          fallback="ignore sddShippingOptions", stage="policies")
     
     # Pattern 5: Returns info from Shopify settings
     returns_info_match = re.search(
@@ -438,9 +471,13 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
         returns_text = returns_info_match.group(1)
         if 'free' in returns_text.lower():
             result['free_returns'] = True
+            obs.note('free_returns', True, 'regex', "homepage JS fallback: sddReturnsInfo mentions 'free'",
+                     stage='policies')
         days_match = re.search(r'(\d+)\s+days', returns_text)
         if days_match and result['return_days'] is None:
             result['return_days'] = int(days_match.group(1))
+            obs.note('return_days', int(days_match.group(1)), 'regex', "homepage JS fallback: sddReturnsInfo",
+                     stage='policies')
     
     # Pattern 6: Check for messaging JSON (common in Shopify)
     messaging_match = re.search(
@@ -451,6 +488,8 @@ def extract_policies_from_homepage_js(html_str: str) -> dict:
         msg = messaging_match.group(1).lower()
         if 'free return' in msg:
             result['free_returns'] = True
+            obs.note('free_returns', True, 'regex', "homepage JS fallback: returnsMessaging mentions 'free return'",
+                     stage='policies')
         if 'free shipping' in msg:
             result['has_free_shipping'] = True
     

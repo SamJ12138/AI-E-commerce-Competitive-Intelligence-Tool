@@ -9,3 +9,4 @@ data/*.pkl
 config.yaml
 .coverage
 .pytest_cache/
+/logs/

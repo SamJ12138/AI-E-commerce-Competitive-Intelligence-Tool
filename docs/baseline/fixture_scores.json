@@ -1,0 +1,1412 @@
+[
+ {
+  "label": "shopify_basic",
+  "store": "shopify_basic",
+  "args": [],
+  "exit_code": 0,
+  "wall_s": 38.0,
+  "site": "http://127.0.0.1:13133",
+  "log": "docs/baseline/logs/run_shopify_basic-20261011T193101.jsonl",
+  "requests_total": 26,
+  "requests_by_status": {
+   "200": 6,
+   "404": 20
+  },
+  "guessed_priority_paths": 20,
+  "guessed_priority_404": 16,
+  "guessed_404_fetch_s": 24.0,
+  "guessed_404_paths": [
+   "/collections",
+   "/products",
+   "/shop",
+   "/catalog",
+   "/pages/shipping",
+   "/shipping",
+   "/pages/returns",
+   "/returns",
+   "/pages/return-policy",
+   "/policies/privacy-policy",
+   "/pages/faq",
+   "/faq",
+   "/pages/about",
+   "/pages/about-us",
+   "/about",
+   "/about-us"
+  ],
+  "fields": [
+   {
+    "field": "platform",
+    "expected": "Shopify",
+    "got": "Shopify",
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "html:Shopify\\.theme; html:shopify-section; html:/cdn/shop/; html:myshopify\\.com; header:x-shopify-stage; header:x-sorting-hat-shopid; shopify_specific_check",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "price_min",
+    "expected": 24.0,
+    "got": 24.0,
+    "verdict": "match",
+    "note": "",
+    "source": "derived",
+    "detail": "min over 2 priced products; 'Classic Tee' http://127.0.0.1:13133/products/classic-tee via selector: card <div class=['card-wrapper', 'product-card-wrapper', 'underline-links-hover']>; title via '.card__heading'; price price via '.price' text 'Regular price$24.00 USDRegular priceSale price$24.00 USD' -> 24.0; compare via '.price-item--regular' text '$24.00 USD' -> 24.0",
+    "source_url": null
+   },
+   {
+    "field": "price_max",
+    "expected": 39.0,
+    "got": 39.0,
+    "verdict": "match",
+    "note": "",
+    "source": "derived",
+    "detail": "max over 2 priced products; 'Everyday Hoodie' http://127.0.0.1:13133/products/everyday-hoodie via selector: card <div class=['card-wrapper', 'product-card-wrapper', 'underline-links-hover']>; title via '.card__heading'; price price via '.price' text 'Regular price$39.00 USDRegular price$49.00 USDSale price$39.00 USD' -> 39.0; compare via '.price-item--regular' text '$39.00 USD' -> 39.0",
+    "source_url": null
+   },
+   {
+    "field": "price_median",
+    "expected": 31.5,
+    "got": 31.5,
+    "verdict": "match",
+    "note": "",
+    "source": "derived",
+    "detail": "median of [24.0, 39.0]",
+    "source_url": null
+   },
+   {
+    "field": "currency",
+    "expected": "USD",
+    "got": "USD",
+    "verdict": "match",
+    "note": "",
+    "source": "derived",
+    "detail": "currency of the last priced product",
+    "source_url": null
+   },
+   {
+    "field": "has_discounts",
+    "expected": true,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "default",
+    "detail": "no product had is_on_sale (2 products, 2 priced)",
+    "source_url": null
+   },
+   {
+    "field": "free_shipping_threshold",
+    "expected": 50.0,
+    "got": 50.0,
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "homepage promo threshold applied because the policy page had none; promo_extractor.FREE_SHIPPING_PATTERNS[0] matched 'free shipping on orders over $50' in page text",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "return_days",
+    "expected": 30,
+    "got": 30.0,
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "return policy accepted from http://127.0.0.1:13133/policies/refund-policy (evidence level 1); policy_extractor.RETURN_DAYS_PATTERNS[0] matched '30-day return'",
+    "source_url": "http://127.0.0.1:13133/policies/refund-policy"
+   },
+   {
+    "field": "free_returns",
+    "expected": true,
+    "got": true,
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "return policy accepted from http://127.0.0.1:13133/policies/refund-policy (evidence level 1); free_return_patterns 'returns?\\\\s+are\\\\s+free' matched 'returns are free'",
+    "source_url": "http://127.0.0.1:13133/policies/refund-policy"
+   },
+   {
+    "field": "payment_methods",
+    "expected": [
+     "PayPal",
+     "Visa"
+    ],
+    "got": [
+     "Credit Card",
+     "PayPal"
+    ],
+    "verdict": "partial",
+    "note": "card brands reported only as generic 'Credit Card'",
+    "source": "regex",
+    "detail": "PayPal: PAYMENT_METHODS substring 'paypal' in html+text ('<svg aria-labelledby=\"pi-paypal\" class=\"icon icon--full-'); Credit Card: PAYMENT_METHODS substring 'visa' in html+text ('<svg aria-labelledby=\"pi-visa\" class=\"icon icon--full-')",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "review_platform",
+    "expected": "Yotpo",
+    "got": "Yotpo",
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "REVIEW_PLATFORMS['Yotpo'] substring 'yotpo' in raw html",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "has_email_capture",
+    "expected": true,
+    "got": true,
+    "verdict": "match",
+    "note": "",
+    "source": "selector",
+    "detail": "EMAIL_CAPTURE_SELECTORS '.newsletter-form' -> <form class=['footer__newsletter', 'newsletter-form'] id=ContactFooter>",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "has_popup",
+    "expected": false,
+    "got": false,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no POPUP_SELECTORS or popup library substring matched",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "has_loyalty",
+    "expected": false,
+    "got": true,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "regex",
+    "detail": "loyalty platform substring 'yotpo' in raw html",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "has_referral",
+    "expected": false,
+    "got": false,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no REFERRAL_KEYWORDS or referral platform substring",
+    "source_url": "http://127.0.0.1:13133"
+   },
+   {
+    "field": "pixels",
+    "expected": [],
+    "got": [
+     "Google Analytics"
+    ],
+    "verdict": "mismatch",
+    "note": "",
+    "source": "regex",
+    "detail": "Google Analytics: pattern 'G-[A-Z0-9]+' (IGNORECASE) matched 'g-link': 'dth\"> <a class=\"header__heading-link\" href=\"/\"><span class=\"h2\">No'",
+    "source_url": "http://127.0.0.1:13133"
+   }
+  ],
+  "checks": {
+   "csv_rows": 1,
+   "brand_positioning": "时尚服饰品牌，面向年轻消费者、男性",
+   "brand_positioning_is_chinese_under_lang_en": true,
+   "business_competitors_analyzed": 1,
+   "business_says_multiple_players": true,
+   "business_says_shopify_reliance": true,
+   "business_claims_qwen_analysis": true,
+   "business_claims_robots_respected": true,
+   "report_md_insights_chinese_under_lang_en": true
+  },
+  "fetches": [
+   {
+    "url": "http://127.0.0.1:13133",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 10743,
+    "error_type": null,
+    "chain": [
+     "requests(200, 10743B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 10743,
+    "error_type": null,
+    "chain": [
+     "requests(200, 10743B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/sitemap_index.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/sitemap.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/sitemap-products.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/products.json",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/collections",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/collections/all",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 6766,
+    "error_type": null,
+    "chain": [
+     "requests(200, 6766B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/products",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/shop",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/catalog",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/policies/shipping-policy",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 1980,
+    "error_type": null,
+    "chain": [
+     "requests(200, 1980B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/shipping",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/shipping",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/policies/refund-policy",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 2446,
+    "error_type": null,
+    "chain": [
+     "requests(200, 2446B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/returns",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/returns",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/return-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/policies/privacy-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/faq",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/faq",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/about",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/pages/about-us",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/about",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:13133/about-us",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   }
+  ],
+  "summary": {
+   "match": 12,
+   "partial": 1,
+   "mismatch": 3
+  }
+ },
+ {
+  "label": "woocommerce_promo",
+  "store": "woocommerce_promo",
+  "args": [],
+  "exit_code": 0,
+  "wall_s": 36.6,
+  "site": "http://127.0.0.1:10321",
+  "log": "docs/baseline/logs/run_woocommerce_promo-20261011T193140.jsonl",
+  "requests_total": 25,
+  "requests_by_status": {
+   "200": 4,
+   "404": 21
+  },
+  "guessed_priority_paths": 20,
+  "guessed_priority_404": 18,
+  "guessed_404_fetch_s": 27.0,
+  "guessed_404_paths": [
+   "/collections",
+   "/collections/all",
+   "/products",
+   "/catalog",
+   "/policies/shipping-policy",
+   "/pages/shipping",
+   "/shipping",
+   "/policies/refund-policy",
+   "/pages/returns",
+   "/returns",
+   "/pages/return-policy",
+   "/policies/privacy-policy",
+   "/pages/faq",
+   "/faq",
+   "/pages/about",
+   "/pages/about-us",
+   "/about",
+   "/about-us"
+  ],
+  "fields": [
+   {
+    "field": "platform",
+    "expected": "WooCommerce",
+    "got": "WooCommerce",
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "html:woocommerce; html:wp-content.*woocommerce; html:add_to_cart_button; script:woocommerce; script:/wp-content/plugins/woocommerce; script:woocommerce; script:/wp-content/plugins/woocommerce; meta:generator=wordpress; meta:generator=woocommerce",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "price_min",
+    "expected": 28.0,
+    "got": 35.0,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "derived",
+    "detail": "min over 2 priced products; 'Canvas Tote' http://127.0.0.1:10321/product/canvas-tote/ via selector: card <li class=['product', 'type-product', 'post-14', 'status-publish', 'instock', 'product_cat-bags', 'has-post-thumbnail', 'sale', 'shipping-taxable', 'purchasable', 'product-type-simple']>; title via 'h2'; price price via '.price' text '$35.00Original price was: $35.00.$28.00Current price is: $28.00.' -> 35.0; compare via 'del' text '$35.00' -> 35.0",
+    "source_url": null
+   },
+   {
+    "field": "price_max",
+    "expected": 48.0,
+    "got": 60.0,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "derived",
+    "detail": "max over 2 priced products; 'Linen Shirt' http://127.0.0.1:10321/product/linen-shirt/ via selector: card <li class=['product', 'type-product', 'post-12', 'status-publish', 'first', 'instock', 'product_cat-shirts', 'has-post-thumbnail', 'sale', 'shipping-taxable', 'purchasable', 'product-type-simple']>; title via 'h2'; price price via '.price' text '$60.00Original price was: $60.00.$48.00Current price is: $48.00.' -> 60.0; compare via 'del' text '$60.00' -> 60.0",
+    "source_url": null
+   },
+   {
+    "field": "price_median",
+    "expected": 38.0,
+    "got": 47.5,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "derived",
+    "detail": "median of [35.0, 60.0]",
+    "source_url": null
+   },
+   {
+    "field": "currency",
+    "expected": "USD",
+    "got": "USD",
+    "verdict": "match",
+    "note": "",
+    "source": "derived",
+    "detail": "currency of the last priced product",
+    "source_url": null
+   },
+   {
+    "field": "has_discounts",
+    "expected": true,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "default",
+    "detail": "no product had is_on_sale (2 products, 2 priced)",
+    "source_url": null
+   },
+   {
+    "field": "free_shipping_threshold",
+    "expected": 75.0,
+    "got": 75.0,
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "ad-hoc ShippingPolicy built from the homepage promo threshold; promo_extractor.FREE_SHIPPING_PATTERNS[0] matched 'free shipping on orders over $75' in page text",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "return_days",
+    "expected": 14,
+    "got": null,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "free_returns",
+    "expected": false,
+    "got": null,
+    "verdict": "mismatch",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "payment_methods",
+    "expected": [
+     "Mastercard",
+     "PayPal",
+     "Visa"
+    ],
+    "got": [
+     "Credit Card",
+     "PayPal"
+    ],
+    "verdict": "partial",
+    "note": "card brands reported only as generic 'Credit Card'",
+    "source": "regex",
+    "detail": "PayPal: PAYMENT_METHODS substring 'paypal' in html+text ('\" width=\"38\"/> <img alt=\"paypal\" height=\"24\" src=\"/wp-co'); Credit Card: PAYMENT_METHODS substring 'visa' in html+text ('ayment-icons\"> <img alt=\"visa\" height=\"24\" src=\"/wp-co')",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "review_platform",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_email_capture",
+    "expected": true,
+    "got": true,
+    "verdict": "match",
+    "note": "",
+    "source": "selector",
+    "detail": "EMAIL_CAPTURE_SELECTORS 'input[placeholder*=\"email\"]' -> <input class=None id=None>",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "has_popup",
+    "expected": false,
+    "got": false,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no POPUP_SELECTORS or popup library substring matched",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "has_loyalty",
+    "expected": true,
+    "got": true,
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "LOYALTY_KEYWORDS substring 'rewards' in page text",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "has_referral",
+    "expected": false,
+    "got": false,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no REFERRAL_KEYWORDS or referral platform substring",
+    "source_url": "http://127.0.0.1:10321"
+   },
+   {
+    "field": "pixels",
+    "expected": [
+     "Google Analytics"
+    ],
+    "got": [
+     "Google Analytics"
+    ],
+    "verdict": "match",
+    "note": "",
+    "source": "regex",
+    "detail": "Google Analytics: pattern 'gtag\\\\s*\\\\(' (IGNORECASE) matched 'gtag(': 'ndow.dataLayer || [];function gtag(){dataLayer.push(arguments);}'",
+    "source_url": "http://127.0.0.1:10321"
+   }
+  ],
+  "checks": {
+   "csv_rows": 1,
+   "brand_positioning": "时尚服饰品牌，面向年轻消费者、女性",
+   "brand_positioning_is_chinese_under_lang_en": true,
+   "business_competitors_analyzed": 1,
+   "business_says_multiple_players": true,
+   "business_says_shopify_reliance": true,
+   "business_claims_qwen_analysis": true,
+   "business_claims_robots_respected": true,
+   "report_md_insights_chinese_under_lang_en": true
+  },
+  "fetches": [
+   {
+    "url": "http://127.0.0.1:10321",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 8433,
+    "error_type": null,
+    "chain": [
+     "requests(200, 8433B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 8433,
+    "error_type": null,
+    "chain": [
+     "requests(200, 8433B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/sitemap-products.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/sitemap.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/sitemap_index.xml",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/collections",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/collections/all",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/products",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/shop",
+    "event": "success",
+    "status": 200,
+    "served_by": "requests",
+    "bytes": 5528,
+    "error_type": null,
+    "chain": [
+     "requests(200, 5528B)"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/catalog",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/policies/shipping-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/shipping",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/shipping",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/policies/refund-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/returns",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/returns",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/return-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/policies/privacy-policy",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/faq",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/faq",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/about",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/pages/about-us",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/about",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   },
+   {
+    "url": "http://127.0.0.1:10321/about-us",
+    "event": "fail",
+    "status": 404,
+    "served_by": "requests",
+    "bytes": 0,
+    "error_type": "http",
+    "chain": [
+     "requests(404, 0B, Page not found (404))"
+    ]
+   }
+  ],
+  "summary": {
+   "match": 9,
+   "partial": 1,
+   "mismatch": 6
+  }
+ },
+ {
+  "label": "blocked",
+  "store": "blocked",
+  "args": [],
+  "exit_code": 0,
+  "wall_s": 2.1,
+  "site": "http://127.0.0.1:9159",
+  "log": "docs/baseline/logs/run_blocked-20261011T193216.jsonl",
+  "requests_total": 3,
+  "requests_by_status": {
+   "403": 3
+  },
+  "guessed_priority_paths": 0,
+  "guessed_priority_404": 0,
+  "guessed_404_fetch_s": 0.0,
+  "guessed_404_paths": [],
+  "fields": [
+   {
+    "field": "platform",
+    "expected": null,
+    "got": "Custom/Unknown",
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_min",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_max",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_median",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "currency",
+    "expected": null,
+    "got": "USD",
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_discounts",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "free_shipping_threshold",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "return_days",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "free_returns",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "payment_methods",
+    "expected": null,
+    "got": [],
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "review_platform",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_email_capture",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_popup",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_loyalty",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_referral",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "pixels",
+    "expected": null,
+    "got": [],
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   }
+  ],
+  "checks": {
+   "csv_rows": 1,
+   "brand_positioning": "",
+   "brand_positioning_is_chinese_under_lang_en": false,
+   "business_competitors_analyzed": 1,
+   "business_says_multiple_players": true,
+   "business_says_shopify_reliance": true,
+   "business_claims_qwen_analysis": true,
+   "business_claims_robots_respected": true,
+   "report_md_insights_chinese_under_lang_en": true
+  },
+  "fetches": [
+   {
+    "url": "http://127.0.0.1:9159",
+    "event": "fail",
+    "status": 403,
+    "served_by": "cloudscraper",
+    "bytes": 0,
+    "error_type": "blocked",
+    "chain": [
+     "requests(403, 0B, Access forbidden (403))",
+     "cloudscraper(403, 0B, Cloudscraper blocked (403))"
+    ]
+   }
+  ],
+  "summary": {
+   "match": 10,
+   "partial": 0,
+   "mismatch": 6
+  }
+ },
+ {
+  "label": "blocked_render_js",
+  "store": "blocked",
+  "args": [
+   "--render-js"
+  ],
+  "exit_code": 0,
+  "wall_s": 6.0,
+  "site": "http://127.0.0.1:9164",
+  "log": "docs/baseline/logs/run_blocked_render_js-20261011T193219.jsonl",
+  "requests_total": 5,
+  "requests_by_status": {
+   "403": 5
+  },
+  "guessed_priority_paths": 0,
+  "guessed_priority_404": 0,
+  "guessed_404_fetch_s": 0.0,
+  "guessed_404_paths": [],
+  "fields": [
+   {
+    "field": "platform",
+    "expected": null,
+    "got": "Custom/Unknown",
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_min",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_max",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "price_median",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "currency",
+    "expected": null,
+    "got": "USD",
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_discounts",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "free_shipping_threshold",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "return_days",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "free_returns",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "payment_methods",
+    "expected": null,
+    "got": [],
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "review_platform",
+    "expected": null,
+    "got": null,
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_email_capture",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_popup",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_loyalty",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "has_referral",
+    "expected": null,
+    "got": false,
+    "verdict": "mismatch",
+    "note": "definite value for data the tool could not have seen",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   },
+   {
+    "field": "pixels",
+    "expected": null,
+    "got": [],
+    "verdict": "match",
+    "note": "",
+    "source": "default",
+    "detail": "no extractor produced a value",
+    "source_url": null
+   }
+  ],
+  "checks": {
+   "csv_rows": 1,
+   "brand_positioning": "",
+   "brand_positioning_is_chinese_under_lang_en": false,
+   "business_competitors_analyzed": 1,
+   "business_says_multiple_players": true,
+   "business_says_shopify_reliance": true,
+   "business_claims_qwen_analysis": true,
+   "business_claims_robots_respected": true,
+   "report_md_insights_chinese_under_lang_en": true
+  },
+  "fetches": [
+   {
+    "url": "http://127.0.0.1:9164",
+    "event": "fail",
+    "status": 403,
+    "served_by": "cloudscraper",
+    "bytes": 0,
+    "error_type": "blocked",
+    "chain": [
+     "browser(403, 2798B)",
+     "cloudscraper(403, 0B, Cloudscraper blocked (403))"
+    ]
+   }
+  ],
+  "summary": {
+   "match": 10,
+   "partial": 0,
+   "mismatch": 6
+  }
+ }
+]

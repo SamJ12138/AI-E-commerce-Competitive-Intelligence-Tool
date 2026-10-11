@@ -20,6 +20,7 @@ from .url_utils import (
     normalize_url, categorize_page_type, get_priority_pages,
     extract_links_from_soup, is_internal_link
 )
+from . import obs
 
 logger = logging.getLogger(__name__)
 
@@ -60,24 +61,31 @@ class PageDiscovery:
         # Normalize base URL
         base_url = normalize_url(base_url)
         
+        origin = {}
+
         # 1. Add priority pages first
         priority = get_priority_pages(base_url)
         for url, page_type in priority:
             if url not in seen and self.robots_checker.is_allowed(url):
                 seen.add(url)
                 discovered.append((url, page_type))
-        
+                origin[url] = 'guessed_priority_path'
+
         logger.info(f"Added {len(discovered)} priority pages for {base_url}")
-        
+        obs.event("discovery", "success", kind="priority_paths", candidates=len(priority),
+                  added=len(discovered))
+
         # 2. Try to parse sitemap
         sitemap_pages = self._parse_sitemap(base_url)
         for url, page_type in sitemap_pages:
             if url not in seen and self.robots_checker.is_allowed(url):
                 seen.add(url)
                 discovered.append((url, page_type))
-        
+                origin[url] = 'sitemap'
+
         logger.info(f"Added {len(sitemap_pages)} pages from sitemap")
-        
+        obs.event("discovery", "success", kind="sitemap", found=len(sitemap_pages))
+
         # 3. Crawl links from home page if we don't have enough pages
         if len(discovered) < self.config.max_pages:
             crawled = self._crawl_links(base_url, seen)
@@ -85,6 +93,11 @@ class PageDiscovery:
                 if len(discovered) >= self.config.max_pages:
                     break
                 discovered.append((url, page_type))
+                origin[url] = 'homepage_link'
+        else:
+            obs.degraded("page_discovery.py:discover", "unknown",
+                         f"{len(discovered)} guessed/sitemap pages already >= max_pages={self.config.max_pages}",
+                         fallback="homepage links are never crawled", stage="discovery")
         
         # Sort by priority: home first, then collections, products, policies
         priority_order = {
@@ -99,9 +112,13 @@ class PageDiscovery:
         discovered.sort(key=lambda x: priority_order.get(x[1], 9))
         
         # Limit to max pages
+        dropped = discovered[self.config.max_pages:]
         discovered = discovered[:self.config.max_pages]
-        
+
         logger.info(f"Discovered {len(discovered)} total pages for {base_url}")
+        obs.event("discovery", "success", kind="page_list", count=len(discovered),
+                  pages=[{"url": u, "type": t, "origin": origin.get(u)} for u, t in discovered],
+                  dropped_by_max_pages=[u for u, _ in dropped])
         return discovered
     
     def _parse_sitemap(self, base_url: str) -> List[Tuple[str, str]]:
@@ -135,13 +152,17 @@ class PageDiscovery:
         
         # Validate URL
         if not sitemap_url or not sitemap_url.startswith('http'):
+            obs.degraded("page_discovery.py:_fetch_sitemap", "input_invalid", "invalid sitemap URL",
+                         fallback="[]", stage="discovery", url=sitemap_url)
             logger.debug(f"Invalid sitemap URL: {sitemap_url}")
             return pages
-        
+
         try:
             html, status, headers, error = self.client.fetch(sitemap_url)
-            
+
             if error or not html:
+                obs.degraded("page_discovery.py:_fetch_sitemap", obs.classify_fetch(status, error) or "http",
+                             error or "empty sitemap body", fallback="[]", stage="discovery", url=sitemap_url)
                 return pages
             
             # Try to parse as XML
@@ -173,8 +194,12 @@ class PageDiscovery:
             logger.debug(f"Found {len(urls)} URLs in {sitemap_url}")
             
         except ET.ParseError:
+            obs.swallowed("page_discovery.py:_fetch_sitemap", error_type="parse", fallback="pages so far",
+                          stage="discovery", url=sitemap_url)
             logger.debug(f"Could not parse sitemap XML: {sitemap_url}")
         except Exception as e:
+            obs.swallowed("page_discovery.py:_fetch_sitemap", fallback="pages so far",
+                          stage="discovery", url=sitemap_url)
             logger.debug(f"Sitemap fetch error for {sitemap_url}: {e}")
         
         return pages
@@ -189,8 +214,10 @@ class PageDiscovery:
         
         # Fetch home page
         soup, status, error = self.client.fetch_and_parse(base_url)
-        
+
         if error or not soup:
+            obs.degraded("page_discovery.py:_crawl_links", obs.classify_fetch(status, error) or "http",
+                         error or "no soup", fallback="no crawled links", stage="discovery", url=base_url)
             return pages
         
         # Extract links

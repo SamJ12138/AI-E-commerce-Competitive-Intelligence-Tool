@@ -43,6 +43,7 @@ from modules import (
     extract_categories as extract_categories_module,
     PolicyExtractor,
 )
+from modules import obs
 
 # Setup rich console for pretty output
 console = Console()
@@ -91,10 +92,12 @@ def load_sites(sites_file: str) -> List[str]:
     
     if not urls:
         raise ValueError(f"No URLs found in {sites_file}")
-    
+
     # Normalize and deduplicate
     normalized = [normalize_url(url) for url in urls]
     unique = deduplicate_urls(normalized)
+    obs.event("load", "success", kind="sites_loaded", sites_file=str(sites_file), lines=len(urls),
+              unique=len(unique), duplicates_dropped=len(urls) - len(unique), urls=unique)
     
     console.print(f"[green]Loaded {len(unique)} unique URLs from {sites_file}[/green]")
     return unique
@@ -129,7 +132,8 @@ def extract_brand_info(soup, html_str: str) -> Tuple[str, str, str, str]:
     og_title = soup.find('meta', property='og:site_name')
     if og_title and og_title.get('content'):
         brand_name = og_title.get('content', '')[:50]
-    
+        obs.note('brand_name', brand_name, 'selector', "meta[property=og:site_name]")
+
     if not brand_name:
         title_tag = soup.find('title')
         if title_tag:
@@ -138,9 +142,11 @@ def extract_brand_info(soup, html_str: str) -> Tuple[str, str, str, str]:
             for sep in ['|', '-', '–', '—', ':', '•']:
                 if sep in title:
                     brand_name = title.split(sep)[0].strip()
+                    obs.note('brand_name', brand_name, 'selector', f"<title> split on {sep!r}")
                     break
             if not brand_name:
                 brand_name = title[:50]
+                obs.note('brand_name', brand_name, 'selector', "<title>[:50]")
     
     # Get hero text from common hero section selectors - expanded
     hero_selectors = [
@@ -168,6 +174,8 @@ def extract_brand_info(soup, html_str: str) -> Tuple[str, str, str, str]:
                     hero_text = text
                     break
         except Exception:
+            obs.swallowed("main.py:extract_brand_info", error_type="parse", fallback="next hero selector",
+                          stage="brand", selector=selector)
             continue
     
     # If no hero text, try first significant h1
@@ -198,6 +206,8 @@ def extract_brand_info(soup, html_str: str) -> Tuple[str, str, str, str]:
                     tagline = text[:150]
                     break
         except Exception:
+            obs.swallowed("main.py:extract_brand_info", error_type="parse", fallback="next tagline selector",
+                          stage="brand", selector=selector)
             continue
     
     # Combine hero and tagline for better context
@@ -258,10 +268,21 @@ def generate_brand_description_zh(
             audiences.append(aud)
     
     audience_str = "、".join(audiences[:2]) if audiences else "大众消费者"
-    
+
     # Build description
     description = f"{category}品牌，面向{audience_str}"
-    
+
+    cat_hit = next(((cat, kw) for cat, kws in category_keywords.items() for kw in kws if kw in combined_text), None)
+    aud_hits = [(aud, next(kw for kw in kws if kw in combined_text))
+                for aud, kws in audience_keywords.items() if any(kw in combined_text for kw in kws)]
+    obs.note('brand_positioning', description, 'regex' if (cat_hit or aud_hits) else 'default',
+             (f"category {cat_hit[1]!r} -> {cat_hit[0]} ({obs.snippet(combined_text, cat_hit[1], 25)!r})"
+              if cat_hit else "no category keyword -> 综合品类")
+             + "; audience " + (", ".join(f"{kw!r} -> {aud}" for aud, kw in aud_hits[:2]) if aud_hits
+                                 else "none -> 大众消费者")
+             + "; substring match over meta+hero+tagline+html[:5000]; always Chinese regardless of --lang",
+             stage='brand')
+
     return description
 
 
@@ -277,9 +298,15 @@ def extract_categories(soup, base_url: str = "") -> List[str]:
         try:
             result = extract_categories_module(soup, base_url)
             if result.get('categories'):
+                obs.note('categories', result['categories'][:15], 'selector',
+                         "category_extractor: nav selectors, /collections/ links, footer shop sections",
+                         stage='categories')
                 return result['categories'][:15]  # Return up to 15 categories
+            obs.degraded("main.py:extract_categories", "parse", "category_extractor found nothing",
+                         fallback="legacy nav selectors", stage="categories")
         except Exception:
-            pass
+            obs.swallowed("main.py:extract_categories", error_type="parse", fallback="legacy nav selectors",
+                          stage="categories")
     
     # Fallback to legacy extraction method
     categories = []
@@ -372,6 +399,8 @@ def extract_categories(soup, base_url: str = "") -> List[str]:
                         seen_texts.add(clean_text.lower())
                         categories.append(clean_text)
         except Exception:
+            obs.swallowed("main.py:extract_categories", error_type="parse", fallback="next nav selector",
+                          stage="categories", selector=selector)
             continue
     
     # If we still don't have categories, try to extract from any prominent links
@@ -384,7 +413,9 @@ def extract_categories(soup, base_url: str = "") -> List[str]:
                 if len(text) > 2 and len(text) < 40:
                     seen_texts.add(text.lower())
                     categories.append(text)
-    
+
+    obs.note('categories', categories[:15], 'selector' if categories else 'default',
+             "legacy nav selectors in main.extract_categories (+ breadcrumbs when < 3)", stage='categories')
     return categories[:15]  # Limit to 15
 
 
@@ -426,19 +457,30 @@ def analyze_site(
     
     # Step 1: Fetch homepage
     update_progress("Fetching homepage...")
+    obs.set_page(url)
+    t = obs.begin("fetch_homepage", url=url)
     soup, status, error = client.fetch_and_parse(url)
-    
+
     if error:
+        obs.event("fetch_homepage", "fail", duration_ms=t.ms(), error_type=obs.classify_fetch(status, error),
+                  error_message=error, url=url, status=status)
+        obs.degraded("main.py:analyze_site", obs.classify_fetch(status, error) or "http",
+                     "homepage fetch failed; analysis stops here",
+                     fallback="SiteIntelligence with defaults is still saved and reported (and AI-scored with --ai)",
+                     stage="fetch_homepage", event_name="fail")
         intel.errors.append(f"Homepage fetch failed: {error}")
         logger.warning(f"Failed to fetch {url}: {error}")
         return intel
-    
+
     intel.pages_crawled.append(url)
     html_str = str(soup)
-    
+    obs.end("fetch_homepage", t, url=url, status=status, chars=len(html_str))
+
     # Check if this is a protected site placeholder
     is_protected_site = 'Bot protection detected' in html_str or 'strong bot protection' in html_str
     if is_protected_site:
+        obs.degraded("main.py:analyze_site", "blocked", "homepage is the PROTECTED_SITES placeholder",
+                     fallback="continue extracting from placeholder HTML", stage="fetch_homepage", event_name="fail")
         logger.info(f"Site {domain} has bot protection - providing limited analysis")
         intel.errors.append("Site has bot protection - limited automated data available. Manual analysis recommended.")
         intel.platform = Platform.CUSTOM
@@ -447,26 +489,33 @@ def analyze_site(
     
     # Step 2: Detect platform
     update_progress("Detecting platform...")
+    t = obs.begin("platform", note="homepage fetched a second time only to read response headers")
     html_content, _, headers, _ = client.fetch(url)
     platform, confidence, signals = detect_platform(soup, headers or {}, url)
     intel.platform = platform
     intel.platform_confidence = confidence
     intel.platform_signals = signals
-    
+    obs.end("platform", t, platform=platform.value, confidence=confidence, signals=signals)
+
     # Step 3: Extract brand info
     update_progress("Extracting brand info...")
+    t = obs.begin("brand")
     brand_name, desc_zh, meta_desc, hero = extract_brand_info(soup, html_str)
     intel.brand_name = brand_name
     intel.brand_description_zh = desc_zh
     intel.meta_description = meta_desc
     intel.hero_text = hero
-    
+    obs.end("brand", t, brand_name=brand_name, hero_text=hero[:120])
+
     # Step 4: Extract categories from navigation
     update_progress("Extracting categories...")
+    t = obs.begin("categories")
     intel.categories = extract_categories(soup, url)
-    
+    obs.end("categories", t, count=len(intel.categories))
+
     # Step 5: Extract promotions from homepage
     update_progress("Analyzing promotions...")
+    t = obs.begin("promos", page=url)
     promo_data = extract_promotions(soup, html_str)
     intel.promotions = promo_data['promotions']
     intel.announcement_bar_text = promo_data['announcement_bar_text']
@@ -476,9 +525,12 @@ def analyze_site(
     intel.has_referral_program = promo_data['has_referral_program']
     intel.social_embeds = promo_data['social_embeds']
     intel.pixels = promo_data['pixels']
-    
+    obs.end("promos", t, promotions=len(intel.promotions),
+            homepage_only=True)
+
     # Step 6: Extract trust signals
     update_progress("Analyzing trust signals...")
+    t = obs.begin("trust", page=url)
     trust_data = extract_trust_signals(soup, html_str)
     intel.trust_signals = trust_data['trust_signals']
     intel.review_platform = trust_data['review_platform']
@@ -493,6 +545,7 @@ def analyze_site(
         # Extract from Judge.me settings if present
         if not intel.review_platform and ('jdgm' in html_str.lower() or 'judge.me' in html_str.lower()):
             intel.review_platform = 'Judge.me'
+            obs.note('review_platform', 'Judge.me', 'regex', "main.py Shopify supplement: 'jdgm'/'judge.me' in html")
             jdgm_match = re.search(r'window\.jdgmSettings\s*=\s*({[^;]+});', html_str)
             if jdgm_match:
                 try:
@@ -501,8 +554,11 @@ def analyze_site(
                     count_match = re.search(r'([\d,]+)\+?\s*(others|reviews|customers)', title, re.I)
                     if count_match and not intel.total_reviews:
                         intel.total_reviews = int(count_match.group(1).replace(',', ''))
+                        obs.note('review_count', intel.total_reviews, 'json',
+                                 "main.py Shopify supplement: jdgmSettings.widget_title")
                 except:
-                    pass
+                    obs.swallowed("main.py:analyze_site", error_type="parse",
+                                  fallback="review count unchanged", stage="trust")
         
         # Extract payment methods from Apple Pay JSON
         if not intel.payment_methods:
@@ -519,15 +575,20 @@ def analyze_site(
                     if data.get('shopifyPaymentsEnabled'):
                         methods.append('Shop Pay')
                     intel.payment_methods = list(set(methods))
+                    obs.note('payment_methods', intel.payment_methods, 'json',
+                             "main.py Shopify supplement: script#apple-pay-shop-capabilities")
                 except:
-                    pass
-            
+                    obs.swallowed("main.py:analyze_site", error_type="parse",
+                                  fallback="payment methods unchanged", stage="trust")
+
             # Check PayPal meta
             paypal_meta = soup.select_one('meta#in-context-paypal-metadata')
             if paypal_meta and 'PayPal' not in (intel.payment_methods or []):
                 if not intel.payment_methods:
                     intel.payment_methods = []
                 intel.payment_methods.append('PayPal')
+                obs.note('payment_methods', list(intel.payment_methods), 'selector',
+                         "main.py Shopify supplement: meta#in-context-paypal-metadata")
         
         # Extract free shipping from page text
         if not promo_data.get('free_shipping_threshold'):
@@ -541,6 +602,9 @@ def analyze_site(
                 match = re.search(pattern, text, re.I)
                 if match:
                     promo_data['free_shipping_threshold'] = float(match.group(1))
+                    obs.note('free_shipping_threshold', float(match.group(1)), 'regex',
+                             f"main.py Shopify supplement shipping_patterns[{shipping_patterns.index(pattern)}] "
+                             f"matched {match.group(0)!r}")
                     break
         
         # Update announcement bar if not found
@@ -555,13 +619,19 @@ def analyze_site(
                     promo_indicators = ['free', 'ship', 'off', 'sale', 'save', 'buy', 'get', '%', '$']
                     if any(ind in text.lower() for ind in promo_indicators):
                         intel.announcement_bar_text = text[:200]
+                        obs.note('announcement_bar', intel.announcement_bar_text, 'selector',
+                                 "main.py Shopify supplement: class contains 'promo'")
                         break
-    
+    obs.end("trust", t, review_platform=intel.review_platform, payment_methods=intel.payment_methods)
+
     # Step 7: Discover and analyze additional pages
     update_progress("Discovering pages...")
+    t = obs.begin("discovery")
     pages = discover_pages(url, client, robots_checker, config)
-    
+    obs.end("discovery", t, pages=len(pages))
+
     all_products = []
+    t_products = obs.begin("products")
     
     # For Shopify sites, ensure we try /collections/all and /products.json
     if intel.platform == Platform.SHOPIFY:
@@ -585,16 +655,25 @@ def analyze_site(
                             p = extractor._parse_shopify_product(prod_data, url)
                             if p:
                                 all_products.append(p)
+                                _log_product(p, products_json_url)
                         logger.info(f"Extracted {len(data['products'])} products from products.json")
                 except json.JSONDecodeError:
-                    pass
+                    obs.swallowed("main.py:analyze_site", error_type="parse", fallback="no products.json products",
+                                  stage="products", url=products_json_url)
+            else:
+                obs.degraded("main.py:analyze_site", obs.classify_fetch(status, error) or "http",
+                             f"products.json unavailable: {error}", fallback="HTML pages only",
+                             stage="products", url=products_json_url)
         except Exception as e:
+            obs.swallowed("main.py:analyze_site", fallback="HTML pages only", stage="products",
+                          url=products_json_url)
             logger.debug(f"Could not fetch products.json: {e}")
         
         # Ensure /collections/all is in the pages list
         collections_all = normalize_url(urljoin(url, '/collections/all'))
         if not any(p[0] == collections_all for p in pages):
             pages.insert(1, (collections_all, 'collection'))
+            obs.event("discovery", "success", kind="collections_all_inserted", url=collections_all)
     
     # Analyze discovered pages
     for page_url, page_type in pages[:config.max_pages]:
@@ -602,21 +681,27 @@ def analyze_site(
             continue
         
         update_progress(f"Analyzing {page_type} page...")
-        
+
+        obs.set_page(page_url)
         page_soup, page_status, page_error = client.fetch_and_parse(page_url)
-        
+
         if page_error:
+            obs.event("products" if page_type in ('collection', 'product', 'home') else "policies", "fail",
+                      error_type=obs.classify_fetch(page_status, page_error), error_message=page_error,
+                      kind="page_fetch_failed", url=page_url, page_type=page_type, status=page_status)
             intel.pages_failed.append(page_url)
             intel.errors.append(f"Failed to fetch {page_url}: {page_error}")
             continue
-        
+
         intel.pages_crawled.append(page_url)
         page_html = str(page_soup)
-        
+
         # Extract products from collection/product pages
         if page_type in ('collection', 'product', 'home'):
             products = extract_products(page_soup, page_url, intel.platform, page_type)
             all_products.extend(products)
+            for p in products:
+                _log_product(p, page_url)
             
             # Check for bundles/subscriptions
             for p in products:
@@ -647,18 +732,40 @@ def analyze_site(
                 shipping.evidence_url = page_url
                 shipping.requires_manual_verification = (evidence_level >= 3)
                 intel.shipping_policy = shipping
-            
+                obs.event("policies", "success", kind="shipping_policy_accepted", url=page_url,
+                          evidence_level=evidence_level, threshold=shipping.free_shipping_threshold)
+                obs.apply('free_shipping_threshold', shipping.free_shipping_threshold,
+                          f"shipping policy accepted from {page_url} (evidence level {evidence_level})",
+                          stage="policies")
+            elif shipping:
+                obs.event("policies", "skip", kind="shipping_policy_ignored", url=page_url,
+                          threshold=shipping.free_shipping_threshold,
+                          reason="a policy is already set and this page has no threshold")
+
             if returns and (not intel.return_policy or returns.return_days is not None):
                 returns.evidence_level = evidence_level
                 returns.evidence_source = evidence_source
                 returns.evidence_url = page_url
                 returns.requires_manual_verification = (evidence_level >= 3)
                 intel.return_policy = returns
+                obs.event("policies", "success", kind="return_policy_accepted", url=page_url,
+                          evidence_level=evidence_level, return_days=returns.return_days,
+                          free_returns=returns.free_returns)
+                for _f, _v in (('return_days', returns.return_days), ('free_returns', returns.free_returns)):
+                    obs.apply(_f, _v, f"return policy accepted from {page_url} (evidence level {evidence_level})",
+                              stage="policies")
+            elif returns:
+                obs.event("policies", "skip", kind="return_policy_ignored", url=page_url,
+                          return_days=returns.return_days, reason="a policy is already set and this page has no days")
         
         # Stop if we have enough products
         if len(all_products) >= config.max_products:
+            obs.event("products", "skip", kind="page_loop_stopped", reason="max_products reached",
+                      products=len(all_products))
             break
-    
+
+    obs.set_page(None)
+
     # Step 8: Process products and calculate stats
     update_progress("Processing products...")
     
@@ -680,12 +787,16 @@ def analyze_site(
         intel.price_max = price_max
         intel.price_median = price_median
         intel.currency = currency
-        
+
         # Check for discounts
         intel.has_discounts = any(
-            p.price and p.price.is_on_sale 
+            p.price and p.price.is_on_sale
             for p in unique_products
         )
+        _note_price_stats(unique_products, intel)
+    else:
+        obs.degraded("main.py:analyze_site", "parse", "no products extracted from any page",
+                     fallback="homepage JS price fallback", stage="products", event_name="fail")
         
         if intel.has_discounts:
             discount_products = [
@@ -700,6 +811,7 @@ def analyze_site(
     # This is critical for sites like Alo Yoga where prices are in searchSettings.suggestedProducts
     if not intel.price_min and html_str:
         logger.info("No prices from product extraction, trying JavaScript fallback...")
+        obs.event("products", "skip", kind="js_price_fallback", reason="no product price; scanning homepage html")
         js_price_min, js_price_max, js_price_median, js_currency = extract_price_stats_from_html(html_str)
         if js_price_min is not None:
             intel.price_min = js_price_min
@@ -709,8 +821,15 @@ def analyze_site(
                 intel.currency = js_currency
             logger.info(f"Extracted prices from JavaScript: ${js_price_min} - ${js_price_max}")
     
+    obs.end("products", t_products, products=len(unique_products), price_min=intel.price_min,
+            price_max=intel.price_max)
+    t = obs.begin("policies")
+
     # Set free shipping threshold from promotions if not found in policies
     if not intel.shipping_policy:
+        obs.degraded("main.py:analyze_site", "parse", "no shipping policy parsed from any page",
+                     fallback="ad-hoc ShippingPolicy from homepage promo threshold, regions=['United States']",
+                     stage="policies", promo_threshold=promo_data.get('free_shipping_threshold'))
         intel.shipping_policy = type('ShippingPolicy', (), {
             'free_shipping_threshold': promo_data.get('free_shipping_threshold'),
             'regions': ['United States'],
@@ -727,13 +846,21 @@ def analyze_site(
                 'raw_text': self.raw_text
             }
         })()
+        obs.apply('free_shipping_threshold', intel.shipping_policy.free_shipping_threshold,
+                  "ad-hoc ShippingPolicy built from the homepage promo threshold", stage="policies")
     elif promo_data.get('free_shipping_threshold') and not intel.shipping_policy.free_shipping_threshold:
         intel.shipping_policy.free_shipping_threshold = promo_data['free_shipping_threshold']
+        obs.event("policies", "success", kind="threshold_from_homepage_promo",
+                  threshold=promo_data['free_shipping_threshold'],
+                  reason="policy page had no threshold (or 0)")
+        obs.apply('free_shipping_threshold', promo_data['free_shipping_threshold'],
+                  "homepage promo threshold applied because the policy page had none", stage="policies")
     
     # Fallback: Try to extract policies from homepage JavaScript
     # This helps when policy pages are blocked by robots.txt (common on Shopify)
     if html_str:
         js_policies = extract_policies_from_homepage_js(html_str)
+        obs.event("policies", "success", kind="homepage_js_policies", result=js_policies)
         
         # Apply JS-extracted shipping data if not already found
         if js_policies.get('free_shipping_threshold') is not None:
@@ -742,6 +869,8 @@ def analyze_site(
                     from modules.models import ShippingPolicy
                     intel.shipping_policy = ShippingPolicy()
                 intel.shipping_policy.free_shipping_threshold = js_policies['free_shipping_threshold']
+                obs.apply('free_shipping_threshold', js_policies['free_shipping_threshold'],
+                          "homepage JS fallback applied", stage="policies")
         
         # Apply JS-extracted return data if not already found
         if js_policies.get('return_days'):
@@ -750,15 +879,82 @@ def analyze_site(
                     from modules.models import ReturnPolicy
                     intel.return_policy = ReturnPolicy()
                 intel.return_policy.return_days = js_policies['return_days']
+                obs.apply('return_days', js_policies['return_days'], "homepage JS fallback applied",
+                          stage="policies")
         
         if js_policies.get('free_returns'):
             if not intel.return_policy:
                 from modules.models import ReturnPolicy
                 intel.return_policy = ReturnPolicy()
             intel.return_policy.free_returns = True
+            obs.apply('free_returns', True, "homepage JS fallback applied", stage="policies")
     
+    obs.end("policies", t, free_shipping_threshold=getattr(intel.shipping_policy, 'free_shipping_threshold', None),
+            return_days=getattr(intel.return_policy, 'return_days', None))
     update_progress("Complete!")
     return intel
+
+
+def _log_product(p, page_url: str) -> None:
+    """One obs event per extracted product with the rule that produced its price."""
+    info = getattr(p, '_obs', {}) or {}
+    obs.event("products", "success", kind="product", page=page_url, title=p.title, url=p.url,
+              price=p.price.current_price if p.price else None,
+              compare_at=p.price.compare_at_price if p.price else None,
+              on_sale=p.price.is_on_sale if p.price else None,
+              source=info.get('source', 'default'), detail=info.get('detail', ''))
+
+
+def _note_price_stats(products, intel) -> None:
+    """Provenance for price_min / price_max / price_median / currency / has_discounts."""
+    priced = [p for p in products if p.price and p.price.current_price]
+    def who(p):
+        info = getattr(p, '_obs', {}) or {}
+        return f"{p.title!r} {p.url} via {info.get('source', '?')}: {info.get('detail', '')}"
+    if priced:
+        lo = min(priced, key=lambda p: p.price.current_price)
+        hi = max(priced, key=lambda p: p.price.current_price)
+        obs.note('price_min', intel.price_min, 'derived', f"min over {len(priced)} priced products; {who(lo)}")
+        obs.note('price_max', intel.price_max, 'derived', f"max over {len(priced)} priced products; {who(hi)}")
+        obs.note('price_median', intel.price_median, 'derived',
+                 f"median of {sorted(p.price.current_price for p in priced)}")
+        obs.note('currency', intel.currency, 'derived', "currency of the last priced product")
+    sale = [p for p in products if p.price and p.price.is_on_sale]
+    if sale:
+        obs.note('has_discounts', True, 'derived', "is_on_sale on: " + "; ".join(who(p) for p in sale))
+    else:
+        obs.note('has_discounts', False, 'default',
+                 f"no product had is_on_sale ({len(products)} products, {len(priced)} priced)")
+
+
+def _log_final_fields(intel) -> None:
+    """The value each report field ends up with, and the rule that set it."""
+    ship, ret = intel.shipping_policy, intel.return_policy
+    values = {
+        'platform': intel.platform.value,
+        'brand_name': intel.brand_name,
+        'brand_positioning': intel.brand_description_zh or intel.meta_description[:100],
+        'categories': intel.categories,
+        'price_min': intel.price_min,
+        'price_max': intel.price_max,
+        'price_median': intel.price_median,
+        'currency': intel.currency,
+        'has_discounts': intel.has_discounts,
+        'announcement_bar': intel.announcement_bar_text,
+        'has_popup': intel.has_popup,
+        'has_email_capture': intel.has_email_capture,
+        'has_loyalty': intel.has_loyalty_program,
+        'has_referral': intel.has_referral_program,
+        'free_shipping_threshold': getattr(ship, 'free_shipping_threshold', None) if ship else None,
+        'return_days': ret.return_days if ret else None,
+        'free_returns': ret.free_returns if ret else None,
+        'review_platform': intel.review_platform,
+        'review_count': intel.total_reviews,
+        'payment_methods': intel.payment_methods,
+        'pixels_detected': [p.name for p in intel.pixels if p.detected],
+    }
+    for name, value in values.items():
+        obs.field("fields", name, value)
 
 
 @click.command()
@@ -797,10 +993,23 @@ def main(
     """
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
-    
+    obs.init_run()
+    console.print(f"[dim]Run log: {obs.log_path()}[/dim]")
+
     console.print("\n[bold blue]🔍 E-commerce Competitive Intelligence Tool[/bold blue]\n")
-    
+
     # Load configuration
+    t_load = obs.begin("load", sites_file=sites, outdir=outdir, render_js=render_js,
+                       ignore_robots=ignore_robots, timeout=timeout, max_products=max_products,
+                       max_pages=max_pages, monitor=monitor, config=config, ai=ai, ai_model=ai_model,
+                       lang=lang)
+    import modules as modules_pkg
+    if not modules_pkg.AI_AVAILABLE:
+        obs.degraded("modules/__init__.py:<import>", "unknown", "ai_analyzer import failed",
+                     fallback="AI_AVAILABLE=False", stage="load")
+    if config and not Path(config).exists():
+        obs.degraded("main.py:load_config", "input_invalid", f"config file {config!r} not found",
+                     fallback="built-in defaults", stage="load")
     config_data = load_config(config)
     
     # Build config object
@@ -816,6 +1025,14 @@ def main(
         db_path=config_data.get('db_path', 'data/intel_cache.db')
     )
     
+    obs.event("load", "success", kind="config_resolved", config_keys=sorted(config_data),
+              render_js=app_config.render_js, ignore_robots=app_config.ignore_robots,
+              timeout=app_config.timeout, max_products=app_config.max_products,
+              max_pages=app_config.max_pages, db_path=app_config.db_path,
+              rate_limit_delay=app_config.rate_limit_delay,
+              config_keys_ignored=sorted(set(config_data) - {'render_js', 'ignore_robots', 'timeout',
+                                                             'max_products', 'max_pages', 'db_path'}))
+
     # Initialize AI analyzer if enabled
     ai_analyzer = None
     if ai:
@@ -823,25 +1040,32 @@ def main(
             from modules.ai_analyzer import AIAnalyzer, AIConfig
             ai_config = AIConfig(ollama_model=ai_model)
             ai_analyzer = AIAnalyzer(ai_config)
-            
+
             if ai_analyzer.is_ai_available():
                 console.print(f"[green]✓ AI Analysis enabled ({ai_model})[/green]")
             else:
+                obs.degraded("main.py:main", "external_api", "--ai given but Ollama/model unavailable",
+                             fallback="AI stage skipped for every site", stage="ai")
                 console.print(f"[yellow]⚠ AI requested but Ollama not available[/yellow]")
                 console.print("  Start Ollama: ollama serve")
                 console.print(f"  Pull model: ollama pull {ai_model}")
                 ai_analyzer = None
         except ImportError as e:
+            obs.swallowed("main.py:main", error_type="unknown", fallback="AI stage skipped", stage="ai")
             console.print(f"[yellow]⚠ AI modules not available: {e}[/yellow]")
             console.print("  Install with: pip install ollama scikit-learn xgboost")
             ai_analyzer = None
-    
+
     # Load sites
     try:
         site_urls = load_sites(sites)
     except (FileNotFoundError, ValueError) as e:
+        obs.event("load", "fail", duration_ms=t_load.ms(), error_type="input_invalid",
+                  error_message=f"{type(e).__name__}: {e}")
+        obs.close_run()
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+    obs.end("load", t_load, sites=len(site_urls))
     
     # Initialize components
     client = HttpClient(app_config)
@@ -874,46 +1098,74 @@ def main(
             
             for url in site_urls:
                 domain = extract_domain(url)
-                
+                obs.set_site(url)
+                t_site = obs.Timer()
+                obs.event("site", "start", url=url, domain=domain)
+
                 # Check robots.txt
+                if app_config.ignore_robots:
+                    obs.skip("robots", "--ignore-robots / ignore_robots: robots.txt not consulted")
+                t = obs.begin("robots", url=url)
                 if not app_config.ignore_robots and not robots_checker.is_allowed(url):
+                    obs.skip("robots", "robots.txt disallows the homepage; site skipped", url=url)
+                    obs.event("site", "skip", duration_ms=t_site.ms(), error_message="robots.txt disallow")
                     console.print(f"[yellow]Skipping {domain} - blocked by robots.txt[/yellow]")
                     progress.advance(main_task)
                     continue
-                
+                obs.end("robots", t, url=url, allowed=True)
+
                 try:
                     # Analyze site
                     intel = analyze_site(
                         url, client, robots_checker, app_config,
                         progress, main_task
                     )
-                    
+                    _log_final_fields(intel)
+
                     # Handle monitor mode
                     if app_config.monitor_mode:
+                        t = obs.begin("change_diff")
                         change_report = snapshot_store.compute_changes(intel)
                         change_reports[domain] = change_report
-                        
+                        obs.end("change_diff", t, has_changes=bool(change_report and change_report.has_changes()),
+                                compared_with="second-newest stored snapshot (OFFSET 1), before this scan is saved")
+
                         if change_report and change_report.has_changes():
                             console.print(f"[yellow]Changes detected for {domain}[/yellow]")
-                    
+                    else:
+                        obs.skip("change_diff", "--monitor not set")
+
                     # Save snapshot
-                    snapshot_store.save_snapshot(intel)
-                    
+                    t = obs.begin("snapshot", db_path=app_config.db_path)
+                    row_id = snapshot_store.save_snapshot(intel)
+                    obs.end("snapshot", t, row_id=row_id, domain_key=intel.domain,
+                            errors_recorded=len(intel.errors))
+
                     # AI-powered analysis (if enabled)
+                    if not ai_analyzer:
+                        obs.skip("ai", "--ai not set" if not ai else "AI requested but unavailable")
                     if ai_analyzer:
                         try:
+                            t = obs.begin("ai", model=ai_model)
                             console.print(f"  [cyan]Running AI analysis for {domain}...[/cyan]")
                             ai_results = ai_analyzer.analyze_site(intel.to_dict())
-                            
+
                             # Store AI results in intel object for report generation
                             intel.ai_insights = ai_results.get('insights', {})
                             intel.ai_positioning = ai_results.get('positioning', '')
                             intel.ai_pricing = ai_results.get('pricing', {})
                             intel.ai_threat = ai_results.get('threat', {})
-                            
+                            obs.end("ai", t, ai_available=ai_results.get('ai_available'))
+                            for name, value in (('ai_insights', intel.ai_insights.get('key_insights')),
+                                                ('ai_positioning', intel.ai_positioning),
+                                                ('ai_pricing', intel.ai_pricing),
+                                                ('ai_threat', intel.ai_threat.get('score'))):
+                                obs.field("fields", name, value)
+
                             if ai_results.get('ai_available'):
                                 console.print(f"  [green]✓ AI analysis complete[/green]")
                         except Exception as e:
+                            obs.swallowed("main.py:main", fallback="report without AI sections", stage="ai")
                             logger.warning(f"AI analysis failed for {domain}: {e}")
                     
                     # Show scan history for this domain
@@ -922,27 +1174,38 @@ def main(
                         console.print(f"  [dim]📊 Scan #{scan_count} for {domain}[/dim]")
                     
                     intel_results.append(intel)
+                    obs.event("site", "success", duration_ms=t_site.ms(), errors=intel.errors,
+                              pages_crawled=len(intel.pages_crawled), pages_failed=len(intel.pages_failed),
+                              note="appended to the report even when errors is non-empty")
                     console.print(f"[green]✓ Completed: {domain}[/green]")
-                    
+
                 except Exception as e:
+                    obs.swallowed("main.py:main", fallback="site dropped from the report",
+                                  stage=obs.current_stage() or "site")
+                    obs.event("site", "fail", duration_ms=t_site.ms(), error_type=obs.classify_exception(e),
+                              error_message=f"{type(e).__name__}: {e}")
                     logger.exception(f"Error analyzing {url}")
                     console.print(f"[red]✗ Failed: {domain} - {str(e)[:50]}[/red]")
-                
+
                 progress.advance(main_task)
         
+        obs.set_site(None)
         # Generate reports
         if intel_results:
             console.print("\n[blue]Generating reports...[/blue]")
-            
+            t_report = obs.begin("report", sites=len(intel_results), lang=lang)
+
             # Get scan history for all domains
             scan_history = snapshot_store.get_all_domains_history()
-            
+
             # Generate standard report
             md_path, csv_path = report_writer.write_full_report(
-                intel_results, 
+                intel_results,
                 change_reports,
                 "report"
             )
+            obs.event("report", "success", kind="written", files=[md_path, csv_path],
+                      insights_source="InsightGenerator rule templates (language argument unused: Chinese text)")
             
             # Generate business report
             try:
@@ -955,8 +1218,13 @@ def main(
                     "business_report"
                 )
                 console.print(f"  📈 Business Report: {business_path}")
+                obs.event("report", "success", kind="written", files=[business_path],
+                          sites=len(intel_results), domains=sorted({i.domain for i in intel_results}),
+                          ai_ran=ai_analyzer is not None)
             except Exception as e:
+                obs.swallowed("main.py:main", fallback="no business_report.md", stage="report")
                 logger.warning(f"Business report generation failed: {e}")
+            obs.end("report", t_report)
             
             console.print(f"\n[green]✓ Reports generated:[/green]")
             console.print(f"  📄 Markdown: {md_path}")
@@ -977,12 +1245,15 @@ def main(
             stats = snapshot_store.get_stats()
             console.print(f"  Total snapshots stored: {stats['total_snapshots']}")
         else:
+            obs.skip("report", "no site produced a SiteIntelligence")
             console.print("[yellow]No sites were successfully analyzed.[/yellow]")
-    
+
     finally:
         # Cleanup
         client.close()
-    
+        obs.event("run", "success", sites=len(site_urls), analyzed=len(intel_results))
+        obs.close_run()
+
     console.print("\n[bold green]Done![/bold green]\n")
 
 
