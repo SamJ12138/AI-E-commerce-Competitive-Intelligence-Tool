@@ -1,0 +1,57 @@
+# E-commerce Intelligence Tool Configuration
+# Copy this file to config.yaml and customize as needed
+
+# Input/Output
+sites_file: sites.txt
+output_dir: output
+db_path: data/intel_cache.db
+
+# Request settings
+timeout: 30
+rate_limit_delay: 1.5  # Seconds between requests to same domain
+user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Crawling limits
+max_products: 50   # Maximum products to extract per site
+max_pages: 20      # Maximum pages to crawl per site
+
+# Feature flags
+render_js: false      # Use Playwright for JavaScript rendering
+ignore_robots: false  # Ignore robots.txt restrictions
+
+# Language
+language: zh  # Output language (currently only zh supported)
+
+# Advanced: Page discovery priority
+# Pages are discovered in this order
+page_priority:
+  - home
+  - collection
+  - product
+  - policy
+  - about
+  - contact
+
+# Advanced: Keywords for category detection
+# Used to determine brand category for Chinese descriptions
+category_keywords:
+  时尚服饰:
+    - fashion
+    - clothing
+    - apparel
+    - wear
+  配饰珠宝:
+    - accessory
+    - jewelry
+    - bracelet
+    - watch
+  美妆护肤:
+    - beauty
+    - skincare
+    - cosmetics
+    - makeup
+  运动户外:
+    - sport
+    - fitness
+    - athletic
+    - outdoor

@@ -1,0 +1,11 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+output/
+data/*.db
+data/*.pkl
+.env
+config.yaml
+.coverage
+.pytest_cache/

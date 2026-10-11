@@ -1,0 +1,67 @@
+# E-commerce Competitive Intelligence Tool
+# Python 3.10+ required
+
+# Core HTTP and parsing
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.1.0
+html5lib>=1.1
+
+# URL handling and validation
+urllib3>=2.0.0
+tldextract>=5.1.0
+
+# robots.txt compliance
+robotexclusionrulesparser>=1.7.1
+
+# Data handling
+pyyaml>=6.0.1
+pandas>=2.1.0
+
+# Database for caching
+sqlite-utils>=3.35.0
+
+# Optional: JavaScript rendering
+# RECOMMENDED: Use patchright instead of playwright for bot detection bypass
+# Install: pip install patchright && patchright install chrome
+# patchright>=1.49.0
+
+# Standard Playwright (fallback if patchright unavailable)
+playwright>=1.40.0
+
+# Cloudflare bypass for non-browser requests
+cloudscraper>=1.2.71
+
+# CLI
+click>=8.1.0
+rich>=13.7.0
+
+# Date/time handling
+python-dateutil>=2.8.2
+
+# HTML text extraction
+html2text>=2024.2.26
+
+# Rate limiting
+ratelimit>=2.2.1
+
+# Diffing for change detection
+deepdiff>=6.7.0
+
+# ============================================
+# AI/ML Dependencies (for AI-powered analysis)
+# ============================================
+
+# Local LLM via Ollama
+ollama>=0.3.0
+
+# Machine Learning for pricing prediction
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+
+# Numerical computing
+numpy>=1.24.0
+
+# Optional: Transformers for advanced NLP (large download)
+# transformers>=4.35.0
+# torch>=2.1.0

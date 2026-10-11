@@ -1,0 +1,14 @@
+# E-commerce Sites for Analysis
+# Add one URL per line
+# Lines starting with # are comments
+
+# Example Shopify sites (bracelet/accessories)
+https://rastaclat.com
+
+# Example skincare/beauty DTC
+https://pfrankmd.com
+
+# Example sustainable footwear
+https://allbirds.com
+
+# Add your sites below:
