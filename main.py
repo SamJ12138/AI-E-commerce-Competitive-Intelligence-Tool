@@ -44,6 +44,7 @@ from modules import (
     PolicyExtractor,
 )
 from modules import obs
+from modules.pressure_score import score_pressure
 
 # Setup rich console for pretty output
 console = Console()
@@ -968,7 +969,7 @@ def _log_final_fields(intel) -> None:
 @click.option('--monitor', '-m', is_flag=True, default=False, help='Enable monitor mode for change detection')
 @click.option('--config', '-c', default=None, help='Path to config.yaml file')
 @click.option('--verbose', '-v', is_flag=True, default=False, help='Enable verbose logging')
-@click.option('--ai', is_flag=True, default=False, help='Enable AI-powered analysis with Ollama/Qwen2.5')
+@click.option('--ai', is_flag=True, default=False, help='Run the LLM step: insights from a local Ollama model')
 @click.option('--ai-model', default='qwen2.5:7b', help='Ollama model to use (default: qwen2.5:7b)')
 @click.option('--lang', '-l', type=click.Choice(['en', 'zh']), default='zh', help='Report language: en=English, zh=Chinese (default)')
 def main(
@@ -1053,7 +1054,7 @@ def main(
         except ImportError as e:
             obs.swallowed("main.py:main", error_type="unknown", fallback="AI stage skipped", stage="ai")
             console.print(f"[yellow]⚠ AI modules not available: {e}[/yellow]")
-            console.print("  Install with: pip install ollama scikit-learn xgboost")
+            console.print("  Install with: pip install ollama")
             ai_analyzer = None
 
     # Load sites
@@ -1121,6 +1122,12 @@ def main(
                         progress, main_task
                     )
                     _log_final_fields(intel)
+                    pressure = score_pressure(intel)
+                    obs.field("fields", "pressure_score", pressure['score'], source="derived",
+                              detail="rule-based: round(sum(weight * factor)) = "
+                                     f"{pressure['weighted_sum']}; " + "; ".join(
+                                         f"{f['key']} {f['weight']}x{f['score']} {f['inputs']}"
+                                         for f in pressure['factors']))
 
                     # Handle monitor mode
                     if app_config.monitor_mode:
@@ -1150,16 +1157,16 @@ def main(
                             console.print(f"  [cyan]Running AI analysis for {domain}...[/cyan]")
                             ai_results = ai_analyzer.analyze_site(intel.to_dict())
 
-                            # Store AI results in intel object for report generation
-                            intel.ai_insights = ai_results.get('insights', {})
-                            intel.ai_positioning = ai_results.get('positioning', '')
-                            intel.ai_pricing = ai_results.get('pricing', {})
-                            intel.ai_threat = ai_results.get('threat', {})
-                            obs.end("ai", t, ai_available=ai_results.get('ai_available'))
+                            # Keep only text the LLM produced; template fallbacks are not AI output
+                            if ai_results.get('insights_from_llm'):
+                                intel.ai_insights = ai_results.get('insights', {})
+                            if ai_results.get('positioning_from_llm'):
+                                intel.ai_positioning = ai_results.get('positioning', '')
+                            if intel.ai_insights or intel.ai_positioning:
+                                intel.ai_model = ai_results.get('model_used')
+                            obs.end("ai", t, ai_available=ai_results.get('ai_available'), model=intel.ai_model)
                             for name, value in (('ai_insights', intel.ai_insights.get('key_insights')),
-                                                ('ai_positioning', intel.ai_positioning),
-                                                ('ai_pricing', intel.ai_pricing),
-                                                ('ai_threat', intel.ai_threat.get('score'))):
+                                                ('ai_positioning', intel.ai_positioning)):
                                 obs.field("fields", name, value)
 
                             if ai_results.get('ai_available'):

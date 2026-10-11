@@ -20,11 +20,12 @@ A professional-grade competitive intelligence tool that analyzes e-commerce webs
 - Marketing tactics identification (popups, email capture, loyalty programs)
 - Trust signals and payment method detection
 
-**AI-Powered Analysis**
-- Local AI analysis using Qwen2.5 (via Ollama) - no API costs
-- Competitive threat scoring (1-10 scale)
-- Pricing strategy recommendations
-- Key insights generation
+**Optional LLM step (`--ai`)**
+- Key insights from a local model served by Ollama (default qwen2.5:7b) - no API costs
+- Labelled AI in the reports only when the model actually produced the text
+
+**Competitive pressure score (rule-based)**
+- A fixed weighted rubric (1-10); the report prints every weight, factor score and input
 
 **Professional Reports**
 - Executive business report (consulting-style)

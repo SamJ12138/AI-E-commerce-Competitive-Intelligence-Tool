@@ -235,7 +235,13 @@ class SiteIntelligence:
     
     # Errors
     errors: List[str] = field(default_factory=list)
-    
+
+    # Output of the optional LLM step (--ai). Set only for text the LLM actually produced;
+    # ai_model names the Ollama model and stays None when the LLM did not run.
+    ai_insights: Dict[str, Any] = field(default_factory=dict)
+    ai_positioning: str = ""
+    ai_model: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage and serialization."""
         return {

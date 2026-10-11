@@ -1,21 +1,17 @@
 """
-ai_analyzer.py - AI-powered analysis using local LLMs and ML models.
+ai_analyzer.py - The optional LLM step (--ai): a local model served by Ollama.
 
 Provides:
-- Chinese insight generation via Qwen2.5 (Ollama)
-- Competitive analysis via DeepSeek/Qwen
-- Pricing strategy prediction via scikit-learn/XGBoost
-- Competitor threat scoring via custom classifier
+- Chinese insight generation (default model qwen2.5:7b)
+- Brand positioning text
+
+This is the only part of the tool that is AI. The competitive pressure score is
+a fixed rubric in pressure_score.py and runs without it.
 """
 
 import logging
-import json
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-import pickle
-from pathlib import Path
-
-import numpy as np
 
 from . import obs
 
@@ -29,22 +25,6 @@ except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
     OLLAMA_AVAILABLE = False
     logger.warning("Ollama not installed. Install with: pip install ollama")
 
-try:
-    from sklearn.ensemble import RandomForestRegressor, GradientBoostingClassifier
-    from sklearn.preprocessing import StandardScaler, LabelEncoder
-    SKLEARN_AVAILABLE = True
-except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
-    SKLEARN_AVAILABLE = False
-    logger.warning("scikit-learn not installed. Install with: pip install scikit-learn")
-
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:  # obs: import-time, reported by AIAnalyzer.__init__
-    XGBOOST_AVAILABLE = False
-    logger.warning("XGBoost not installed. Install with: pip install xgboost")
-
-
 @dataclass
 class AIConfig:
     """Configuration for AI analysis."""
@@ -55,12 +35,6 @@ class AIConfig:
     # Analysis settings
     enable_chinese_insights: bool = True
     enable_competitive_analysis: bool = True
-    enable_pricing_prediction: bool = True
-    enable_threat_scoring: bool = True
-    
-    # Model paths for saved ML models
-    pricing_model_path: str = "data/pricing_model.pkl"
-    threat_model_path: str = "data/threat_model.pkl"
 
 
 class OllamaClient:
@@ -401,309 +375,9 @@ class CompetitiveAnalyzer:
         return self.client.generate(prompt, self.SYSTEM_PROMPT) or "对比分析失败"
 
 
-class PricingPredictor:
-    """
-    ML-based pricing strategy prediction using scikit-learn and XGBoost.
-    """
-    
-    def __init__(self, model_path: str = "data/pricing_model.pkl"):
-        self.model_path = Path(model_path)
-        self.model = None
-        self.scaler = StandardScaler() if SKLEARN_AVAILABLE else None
-        self._load_or_create_model()
-    
-    def _load_or_create_model(self):
-        """Load existing model or create new one."""
-        if not SKLEARN_AVAILABLE:
-            return
-        
-        if self.model_path.exists():
-            try:
-                with open(self.model_path, 'rb') as f:
-                    saved = pickle.load(f)
-                    self.model = saved['model']
-                    self.scaler = saved['scaler']
-                logger.info(f"Loaded pricing model from {self.model_path}")
-            except Exception as e:
-                obs.swallowed("ai_analyzer.py:PricingPredictor._load_or_create_model", error_type="parse",
-                              fallback="retrain on synthetic data", stage="ai", path=str(self.model_path))
-                logger.warning(f"Could not load model: {e}")
-                self._create_default_model()
-        else:
-            self._create_default_model()
-    
-    def _create_default_model(self):
-        """Create a default model with reasonable defaults."""
-        if XGBOOST_AVAILABLE:
-            self.model = xgb.XGBRegressor(
-                n_estimators=100,
-                max_depth=5,
-                learning_rate=0.1,
-                random_state=42
-            )
-        elif SKLEARN_AVAILABLE:
-            self.model = RandomForestRegressor(
-                n_estimators=100,
-                max_depth=10,
-                random_state=42
-            )
-        
-        # Pre-train with synthetic data for reasonable predictions
-        if self.model and SKLEARN_AVAILABLE:
-            self._pretrain_with_synthetic_data()
-    
-    def _pretrain_with_synthetic_data(self):
-        """Pre-train model with synthetic e-commerce pricing data."""
-        np.random.seed(42)
-        n_samples = 500
-        
-        # Features: [competitor_price, category_tier, has_reviews, has_free_shipping, brand_strength]
-        X = np.column_stack([
-            np.random.uniform(10, 200, n_samples),  # competitor_price
-            np.random.randint(1, 4, n_samples),      # category_tier (1=low, 2=mid, 3=high)
-            np.random.randint(0, 2, n_samples),      # has_reviews
-            np.random.randint(0, 2, n_samples),      # has_free_shipping
-            np.random.uniform(0.3, 1.0, n_samples),  # brand_strength
-        ])
-        
-        # Target: optimal price (slightly below or competitive with competitor)
-        y = X[:, 0] * (0.85 + 0.2 * X[:, 4]) + X[:, 1] * 5 - X[:, 3] * 3
-        
-        X_scaled = self.scaler.fit_transform(X)
-        self.model.fit(X_scaled, y)
-
-        logger.info("Pre-trained pricing model with synthetic data")
-        obs.event("ai", "success", kind="pricing_model_trained", model=type(self.model).__name__,
-                  rows=n_samples, data="synthetic (np.random.seed(42)); target is a fixed formula of the inputs")
-    
-    def predict_optimal_price(
-        self,
-        competitor_price: float,
-        category_tier: int = 2,
-        has_reviews: bool = True,
-        has_free_shipping: bool = False,
-        brand_strength: float = 0.5
-    ) -> Tuple[float, float, float]:
-        """
-        Predict optimal price range.
-        
-        Args:
-            competitor_price: Average competitor price
-            category_tier: 1=budget, 2=mid-range, 3=premium
-            has_reviews: Whether your product has reviews
-            has_free_shipping: Whether you offer free shipping
-            brand_strength: Brand recognition score 0-1
-            
-        Returns:
-            Tuple of (low_price, optimal_price, high_price)
-        """
-        if not self.model or not SKLEARN_AVAILABLE:
-            obs.degraded("ai_analyzer.py:PricingPredictor.predict_optimal_price", "unknown",
-                         "no sklearn model", fallback="competitor_price * 0.9 rule", stage="ai")
-            # Simple rule-based fallback
-            optimal = competitor_price * 0.9
-            return (optimal * 0.85, optimal, optimal * 1.1)
-        
-        features = np.array([[
-            competitor_price,
-            category_tier,
-            int(has_reviews),
-            int(has_free_shipping),
-            brand_strength
-        ]])
-        
-        features_scaled = self.scaler.transform(features)
-        optimal = self.model.predict(features_scaled)[0]
-        
-        # Ensure reasonable bounds
-        optimal = max(5, min(optimal, competitor_price * 1.5))
-        
-        return (optimal * 0.9, optimal, optimal * 1.15)
-    
-    def save_model(self):
-        """Save the trained model."""
-        if self.model and SKLEARN_AVAILABLE:
-            self.model_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.model_path, 'wb') as f:
-                pickle.dump({
-                    'model': self.model,
-                    'scaler': self.scaler
-                }, f)
-            logger.info(f"Saved pricing model to {self.model_path}")
-
-
-class ThreatScorer:
-    """
-    Score competitor threat level using ML classification.
-    """
-    
-    # Threat level definitions
-    THREAT_LEVELS = {
-        1: "极低威胁",
-        2: "很低威胁", 
-        3: "低威胁",
-        4: "较低威胁",
-        5: "中等威胁",
-        6: "较高威胁",
-        7: "高威胁",
-        8: "很高威胁",
-        9: "极高威胁",
-        10: "最高威胁"
-    }
-    
-    def __init__(self):
-        self.weights = {
-            'platform_maturity': 0.15,
-            'price_competitiveness': 0.20,
-            'marketing_sophistication': 0.20,
-            'trust_signals': 0.15,
-            'shipping_advantage': 0.15,
-            'brand_strength': 0.15
-        }
-    
-    def calculate_threat_score(self, intel_data: Dict) -> Tuple[int, str, Dict[str, float]]:
-        """
-        Calculate competitor threat score.
-        
-        Args:
-            intel_data: Site intelligence dictionary
-            
-        Returns:
-            Tuple of (score 1-10, explanation, factor_scores)
-        """
-        factors = {}
-        
-        # Platform maturity (Shopify = most mature)
-        platform = intel_data.get('platform', 'Custom/Unknown')
-        platform_scores = {
-            'Shopify': 9, 'BigCommerce': 8, 'WooCommerce': 7,
-            'Magento': 7, 'Squarespace': 6, 'Wix': 5, 'Custom/Unknown': 4
-        }
-        factors['platform_maturity'] = platform_scores.get(platform, 5)
-        
-        # Price competitiveness (lower median = more competitive)
-        price_median = intel_data.get('price_median') or intel_data.get('price_min') or 50
-        if price_median and price_median > 0:
-            if price_median < 25:
-                factors['price_competitiveness'] = 9
-            elif price_median < 50:
-                factors['price_competitiveness'] = 7
-            elif price_median < 100:
-                factors['price_competitiveness'] = 5
-            else:
-                factors['price_competitiveness'] = 3
-        else:
-            factors['price_competitiveness'] = 5
-        
-        # Marketing sophistication
-        marketing_score = 0
-        if intel_data.get('has_popup'):
-            marketing_score += 2
-        if intel_data.get('has_email_capture'):
-            marketing_score += 2
-        if intel_data.get('has_loyalty_program'):
-            marketing_score += 2
-        if intel_data.get('has_referral_program'):
-            marketing_score += 2
-        if intel_data.get('announcement_bar_text'):
-            marketing_score += 1
-        factors['marketing_sophistication'] = min(marketing_score + 1, 10)
-        
-        # Trust signals
-        trust_score = 0
-        if intel_data.get('review_platform'):
-            trust_score += 3
-        total_reviews = intel_data.get('total_reviews') or 0
-        if total_reviews > 100:
-            trust_score += 2
-        elif total_reviews > 0:
-            trust_score += 1
-        payment_methods = intel_data.get('payment_methods') or []
-        if any(m in payment_methods for m in ['Klarna', 'Afterpay', 'Affirm']):
-            trust_score += 2
-        if len(payment_methods) >= 3:
-            trust_score += 1
-        factors['trust_signals'] = min(trust_score + 1, 10)
-        
-        # Shipping advantage
-        shipping_score = 5  # neutral
-        free_threshold = intel_data.get('free_shipping_threshold')
-        if free_threshold is not None:
-            if free_threshold == 0:
-                shipping_score = 9  # Free shipping on all
-            elif free_threshold < 50:
-                shipping_score = 7
-            elif free_threshold < 100:
-                shipping_score = 5
-            else:
-                shipping_score = 3
-        factors['shipping_advantage'] = shipping_score
-        
-        # Brand strength (based on available signals)
-        brand_score = 5
-        if total_reviews > 500:
-            brand_score += 2
-        if intel_data.get('has_loyalty_program'):
-            brand_score += 1
-        categories = intel_data.get('categories') or []
-        if len(categories) >= 3:
-            brand_score += 1
-        factors['brand_strength'] = min(brand_score, 10)
-        
-        # Calculate weighted score
-        total_score = sum(
-            factors[k] * self.weights[k] 
-            for k in self.weights.keys()
-        )
-        
-        # Normalize to 1-10
-        final_score = max(1, min(10, round(total_score)))
-        
-        # Generate explanation
-        explanation = self._generate_explanation(final_score, factors, intel_data)
-        
-        return final_score, explanation, factors
-    
-    def _generate_explanation(
-        self, 
-        score: int, 
-        factors: Dict[str, float],
-        intel_data: Dict
-    ) -> str:
-        """Generate Chinese explanation for the threat score."""
-        level = self.THREAT_LEVELS.get(score, "中等威胁")
-        
-        # Find top threats
-        sorted_factors = sorted(factors.items(), key=lambda x: x[1], reverse=True)
-        top_threats = sorted_factors[:2]
-        
-        factor_names = {
-            'platform_maturity': '平台成熟度',
-            'price_competitiveness': '价格竞争力',
-            'marketing_sophistication': '营销专业度',
-            'trust_signals': '信任要素',
-            'shipping_advantage': '物流优势',
-            'brand_strength': '品牌实力'
-        }
-        
-        threat_reasons = [factor_names.get(f[0], f[0]) for f in top_threats]
-        
-        explanation = f"威胁等级: {score}/10 ({level})\n"
-        explanation += f"主要威胁因素: {', '.join(threat_reasons)}\n"
-        
-        if score >= 7:
-            explanation += "建议: 该竞品实力较强，需重点关注其策略变化，差异化竞争"
-        elif score >= 4:
-            explanation += "建议: 该竞品有一定竞争力，可借鉴其优势，针对性超越"
-        else:
-            explanation += "建议: 该竞品威胁较小，可专注自身增长"
-        
-        return explanation
-
-
 class AIAnalyzer:
     """
-    Main AI analysis orchestrator combining all AI capabilities.
+    Runs the LLM calls for one site (insights, positioning).
     """
     
     def __init__(self, config: AIConfig = None):
@@ -718,13 +392,9 @@ class AIAnalyzer:
         # Initialize components
         self.insight_generator = ChineseInsightGenerator(self.ollama)
         self.competitive_analyzer = CompetitiveAnalyzer(self.ollama)
-        self.pricing_predictor = PricingPredictor(self.config.pricing_model_path)
-        self.threat_scorer = ThreatScorer()
         obs.event("ai", "success", kind="ai_init", ollama_importable=OLLAMA_AVAILABLE,
-                  sklearn_importable=SKLEARN_AVAILABLE, xgboost_importable=XGBOOST_AVAILABLE,
                   model=self.config.ollama_model, ollama_host_config=self.config.ollama_host,
-                  ollama_host_used="ollama module default / OLLAMA_HOST env (config value not passed)",
-                  pricing_model=type(self.pricing_predictor.model).__name__ if self.pricing_predictor.model else None)
+                  ollama_host_used="ollama module default / OLLAMA_HOST env (config value not passed)")
     
     def is_ai_available(self) -> bool:
         """Check if AI features are available."""
@@ -749,6 +419,7 @@ class AIAnalyzer:
         if self.config.enable_chinese_insights:
             results['insights'] = self.insight_generator.generate_insights(intel_data)
             from_llm = 'raw_response' in results['insights']
+            results['insights_from_llm'] = from_llm
             obs.note('ai_insights', results['insights'].get('key_insights'), 'ai' if from_llm else 'default',
                      f"Ollama {self.config.ollama_model} response parsed by '##' headings" if from_llm
                      else "template fallback (_fallback_insights)", stage='ai')
@@ -757,47 +428,10 @@ class AIAnalyzer:
         if self.config.enable_competitive_analysis:
             results['positioning'] = self.competitive_analyzer.analyze_positioning(intel_data)
             from_llm = results['positioning'] not in ("AI分析不可用", "分析失败")
+            results['positioning_from_llm'] = from_llm
             obs.note('ai_positioning', results['positioning'], 'ai' if from_llm else 'default',
                      f"Ollama {self.config.ollama_model} free text" if from_llm else "fixed failure string",
                      stage='ai')
-        
-        # Pricing prediction
-        if self.config.enable_pricing_prediction:
-            # Safely get price_median, defaulting to 50 if None
-            price_median = intel_data.get('price_median')
-            if price_median is None:
-                price_median = intel_data.get('price_min')
-            if price_median is None:
-                price_median = 50  # Default fallback
-            
-            low, optimal, high = self.pricing_predictor.predict_optimal_price(
-                competitor_price=float(price_median),
-                has_reviews=bool(intel_data.get('total_reviews')),
-                has_free_shipping=intel_data.get('free_shipping_threshold') == 0
-            )
-            results['pricing'] = {
-                'competitor_median': float(price_median),
-                'recommended_low': round(low, 2),
-                'recommended_optimal': round(optimal, 2),
-                'recommended_high': round(high, 2)
-            }
-            obs.note('ai_pricing', results['pricing'], 'derived',
-                     f"{type(self.pricing_predictor.model).__name__ if self.pricing_predictor.model else 'rule'} "
-                     f"fit at startup on 500 synthetic rows; inputs competitor_price={price_median} "
-                     f"({'price_median' if intel_data.get('price_median') is not None else 'price_min or default 50'}), "
-                     f"has_free_shipping read from intel_data['free_shipping_threshold'] which to_dict() never sets",
-                     stage='ai')
-        
-        # Threat scoring
-        if self.config.enable_threat_scoring:
-            score, explanation, factors = self.threat_scorer.calculate_threat_score(intel_data)
-            results['threat'] = {
-                'score': score,
-                'explanation': explanation,
-                'factors': factors
-            }
-            obs.note('ai_threat', score, 'derived',
-                     f"ThreatScorer weighted rubric (no model): factors={factors}", stage='ai')
         
         return results
     
