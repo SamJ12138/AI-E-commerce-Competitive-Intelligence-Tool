@@ -1,0 +1,46 @@
+{
+  "store": "woocommerce_promo",
+  "description": "Storefront-theme WooCommerce store running a sitewide 20% sale, a points loyalty program and a Google Analytics G- tag. 14-day returns paid by the customer. Native WooCommerce reviews (no review app).",
+  "status": "ok",
+  "platform": "WooCommerce",
+  "pages": {
+    "home": "/",
+    "collection": "/shop",
+    "products": ["/product/linen-shirt", "/product/canvas-tote"],
+    "shipping_policy": "/shipping-policy",
+    "refund_policy": "/refund_returns",
+    "robots": "/robots.txt"
+  },
+  "not_served": ["/sitemap.xml", "/wp-sitemap.xml", "/product-category/shirts", "/product-category/bags"],
+  "response_headers": {
+    "X-Powered-By": "PHP/8.2.24",
+    "Link": "</wp-json/>; rel=\"https://api.w.org/\""
+  },
+  "notes": [
+    "WordPress serves pages with a trailing slash; the fixture server answers both /shop and /shop/.",
+    "The Site Kit gtag.js <script src> loader is omitted on purpose so no page ever triggers a real network fetch; the inline gtag('config', 'G-7QF2KX9M3B') call is kept."
+  ],
+  "products": [
+    {"title": "Linen Shirt", "url": "/product/linen-shirt", "price": 48.00, "compare_at_price": 60.00, "on_sale": true},
+    {"title": "Canvas Tote", "url": "/product/canvas-tote", "price": 28.00, "compare_at_price": 35.00, "on_sale": true}
+  ],
+  "expected": {
+    "platform": "WooCommerce",
+    "price_min": 28.0,
+    "price_max": 48.0,
+    "price_median": 38.0,
+    "currency": "USD",
+    "has_discounts": true,
+    "discount_percent": 20,
+    "free_shipping_threshold": 75.0,
+    "return_days": 14,
+    "free_returns": false,
+    "payment_methods": ["Mastercard", "PayPal", "Visa"],
+    "review_platform": null,
+    "has_email_capture": true,
+    "has_popup": false,
+    "has_loyalty": true,
+    "has_referral": false,
+    "pixels": ["Google Analytics"]
+  }
+}

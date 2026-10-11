@@ -1,0 +1,43 @@
+{
+  "store": "shopify_basic",
+  "description": "Dawn-style Shopify store, two products, one on sale. No loyalty program, no analytics pixels. Yotpo reviews, PayPal + Visa, footer newsletter form.",
+  "status": "ok",
+  "platform": "Shopify",
+  "pages": {
+    "home": "/",
+    "collection": "/collections/all",
+    "products": ["/products/classic-tee", "/products/everyday-hoodie"],
+    "shipping_policy": "/policies/shipping-policy",
+    "refund_policy": "/policies/refund-policy",
+    "robots": "/robots.txt"
+  },
+  "not_served": ["/products.json", "/sitemap.xml"],
+  "response_headers": {
+    "powered-by": "Shopify",
+    "x-shopid": "60000000001",
+    "x-sorting-hat-shopid": "60000000001",
+    "x-shopify-stage": "production"
+  },
+  "products": [
+    {"title": "Classic Tee", "url": "/products/classic-tee", "price": 24.00, "compare_at_price": null, "on_sale": false},
+    {"title": "Everyday Hoodie", "url": "/products/everyday-hoodie", "price": 39.00, "compare_at_price": 49.00, "on_sale": true}
+  ],
+  "expected": {
+    "platform": "Shopify",
+    "price_min": 24.0,
+    "price_max": 39.0,
+    "price_median": 31.5,
+    "currency": "USD",
+    "has_discounts": true,
+    "free_shipping_threshold": 50.0,
+    "return_days": 30,
+    "free_returns": true,
+    "payment_methods": ["PayPal", "Visa"],
+    "review_platform": "Yotpo",
+    "has_email_capture": true,
+    "has_popup": false,
+    "has_loyalty": false,
+    "has_referral": false,
+    "pixels": []
+  }
+}

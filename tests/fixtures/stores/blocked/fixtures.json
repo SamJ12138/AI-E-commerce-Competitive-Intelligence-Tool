@@ -1,0 +1,39 @@
+{
+  "store": "blocked",
+  "description": "Every path, including /robots.txt, answers 403 with a Cloudflare-style managed-challenge body and Cloudflare-style headers (Server: cloudflare, cf-ray, cf-mitigated: challenge). Nothing behind the wall is ever served, so nothing is extractable.",
+  "status": "blocked",
+  "platform": null,
+  "pages": {
+    "every_path": "403 + challenge.html (__HOST__ replaced with the request Host header)"
+  },
+  "response_headers": {
+    "Server": "cloudflare",
+    "cf-ray": "8d2f0c1b9e7a4f21-IAD",
+    "cf-mitigated": "challenge",
+    "Content-Type": "text/html; charset=UTF-8",
+    "Cache-Control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0"
+  },
+  "notes": [
+    "The challenge script tag points at a relative /cdn-cgi/... path, so a browser loading the page only ever asks the fixture server (which answers 403 again).",
+    "The orchestrate path is chl_page (current Cloudflare form), not the captcha/managed/jsch forms that cloudscraper 1.2.71 recognises as a v2 challenge."
+  ],
+  "products": [],
+  "expected": {
+    "platform": null,
+    "price_min": null,
+    "price_max": null,
+    "price_median": null,
+    "currency": null,
+    "has_discounts": null,
+    "free_shipping_threshold": null,
+    "return_days": null,
+    "free_returns": null,
+    "payment_methods": null,
+    "review_platform": null,
+    "has_email_capture": null,
+    "has_popup": null,
+    "has_loyalty": null,
+    "has_referral": null,
+    "pixels": null
+  }
+}
