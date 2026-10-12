@@ -573,6 +573,10 @@ class ProductExtractor:
                     href = link.get('href', '')
                     # Check if link goes to a product page
                     if '/products/' in href:
+                        # badge text on the image link ("Best Seller") is not the title
+                        link = copy.copy(link)
+                        for badge in link.select(self.BADGE_SELECTOR):
+                            badge.decompose()
                         link_text = link.get_text(strip=True)
                         if link_text and len(link_text) > 2 and len(link_text) < 200:
                             title = link_text
@@ -644,7 +648,11 @@ class ProductExtractor:
         's', 'del', 'strike',
         'compare-at-price', '.compare-at-price', '.was-price', '.original-price',
         '.price-compare', '.price__compare', '.line-through',
+        # rendered themes: brooklinen's "Price__Default --slashout"
+        '[class*="slashout"]', '[class*="strikethrough"]', '[class*="compare-at"]',
     ]
+    # Text badges on a card ("Best Seller", "New", "Cooling"): never the product title
+    BADGE_SELECTOR = '[class*="badge" i], [class*="eyebrow" i]'
     # Current price, most specific first (sale price before the generic price block).
     PRICE_SELECTORS = [
         'ins', '.price-item--sale', 'sale-price', '.price__sale', '.sale-price', '.price--sale',

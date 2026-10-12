@@ -145,3 +145,53 @@ end of the batch.
   lists. With `--render-js` the drawn form is in the page and gives a definite answer.
 - RED: 2 new cases in `tests/test_email_capture.py` failed (False instead of None; the report
   case); two controls passed. On the saved homepages only porterandyork changes (False -> None).
+
+### brooklinen: the first real --render-js run
+
+One run, 2026-10-12, `--render-js` with otherwise default settings, cloudscraper off (the
+`real_corpus.py run` setup plus `--render-js`; a hook saved each rendered page to the session's
+scratch directory, not to the repository). It was brooklinen's one visit in this batch, made after
+the static-HTML fixes above.
+
+- Fetch branches: the browser (Chrome via Playwright; patchright is not installed) served all 12
+  pages, status 200 each: homepage, 9 collections, FAQ, returns page, shipping policy, one product
+  page. robots.txt went through `requests` as always. No page fell back to `browser->requests`.
+- Wall time 69.4 s for 12 pages (homepage 9.4 s, then about 4.2-4.8 s per page: the fixed 3 s wait
+  plus load). The Phase 3 default-settings run took 20.9 s for 14 pages.
+- Products: 50 sampled from 7 collections and 1 product page (the default run found none: the
+  catalogue is drawn by JavaScript). Every other field matched the ground truth in this run
+  (threshold 100, 365 days, free returns False, payment methods, Yotpo, loyalty True, email True).
+
+What the browser path got wrong:
+
+- **Card titles were badges.** On the rendered cards the image link, which carries a text badge
+  ("Best Seller", "Cooling", "New to Sale"), comes before the title link; with no title selector
+  matching, the first product link's text was the title (21 of the 32 products of the replay).
+  Badge and eyebrow elements are now left out of link text.
+- **The struck-through price was not read.** Rendered cards show "From: $199 $169 15% off" with the
+  $199 in `span.Price__Default.--slashout`; only `<s>`/`<del>`/compare classes counted, so the
+  current price was right and compare-at was None (no discount seen). `[class*="slashout"]`,
+  `[class*="strikethrough"]` and `[class*="compare-at"]` are compare-at markers now.
+- **An HTTP error in the browser was content** (found reading the browser branch for this run, not
+  hit in it: every page was 200). `_fetch_with_playwright` returned the body of a 403 / 404 / 429 /
+  5xx page with no error, so without the cloudscraper fallback (real-site runs switch it off) a
+  challenge page would be parsed as the store. It now returns an error like the requests branches.
+- RED: `tests/test_rendered_cards.py` 2 of 3 failed (badge titles, compare-at; one control);
+  `tests/test_browser_status.py` 4 of 5 failed (403, 404, 429, 503 returned as content; one
+  control). Replaying the saved rendered pages on 127.0.0.1 (no network): badge titles 21 -> 0,
+  Dreamweave Waffle Robe 118 with compare-at 139, Throw Blanket 110 / 129, Down Comforter 169 / 199,
+  has_discounts False -> True.
+
+Not fixed, filed:
+
+- **The ground truth and the rendered page disagree on brooklinen's prices.** The ground truth was
+  read this morning from the static HTML and product JSON: Down Comforter $199, Robe and Throw from
+  $129, no compare-at price. The rendered cards in this run show every one of them 15% off ($169,
+  $118, $110 with the regular price struck through), a discount that is applied in the browser and
+  is not in the product JSON. The ground truth is not changed after reading the tool's output, so
+  the three products score as mismatches; which one a report should state is for the owner.
+- Down Pillow is in none of the 7 sampled collections (its collection, duvet-inserts-pillows, is
+  beyond `max_pages`).
+- Under `--render-js`, `products.json` and sitemap XML would also be loaded in the browser, which
+  wraps them in HTML, so they would fail to parse. Not hit in this run (the homepage links product
+  pages, so no sitemap was read, and it links no JSON endpoint).

@@ -597,7 +597,13 @@ class HttpClient:
                 
                 status = response.status if response else 200
                 headers = dict(response.headers) if response else {}
-                
+
+                # An HTTP error is not content, as on the requests branches (a 403 challenge page
+                # used to be parsed as the store when no fallback followed)
+                if status >= 400:
+                    reason = {403: "Access forbidden", 404: "Page not found", 429: "Rate limited"}.get(status, "HTTP error")
+                    return None, status, headers, f"{reason} ({status}) in the browser"
+
                 # Get the rendered HTML
                 html = page.content()
                 
