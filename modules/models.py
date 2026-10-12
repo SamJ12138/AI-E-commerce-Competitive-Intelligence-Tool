@@ -179,9 +179,14 @@ class SiteIntelligence:
     domain: str
     url: str
     scan_timestamp: datetime
-    
+
+    # 'ok', 'blocked' (no page answered 2xx) or 'unreachable' (no HTTP answer at all).
+    # For anything but 'ok' every extracted field is None: the tool did not see the site.
+    status: str = "ok"
+    fetch_attempts: List[str] = field(default_factory=list)  # e.g. ['requests 403', 'cloudscraper 403']
+
     # Platform detection
-    platform: Platform = Platform.CUSTOM
+    platform: Optional[Platform] = Platform.CUSTOM
     platform_confidence: float = 0.0
     platform_signals: List[str] = field(default_factory=list)
     
@@ -201,7 +206,7 @@ class SiteIntelligence:
     has_subscriptions: bool = False
     
     # Pricing
-    currency: str = "USD"
+    currency: Optional[str] = "USD"
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_median: Optional[float] = None
@@ -243,13 +248,37 @@ class SiteIntelligence:
     ai_positioning: str = ""
     ai_model: Optional[str] = None
 
+    UNKNOWN_WHEN_BLOCKED = (
+        'platform', 'platform_confidence', 'brand_name', 'brand_positioning', 'brand_positioning_source',
+        'currency', 'price_min', 'price_max', 'price_median', 'has_discounts', 'has_bundles',
+        'has_subscriptions', 'announcement_bar_text', 'has_popup', 'has_email_capture',
+        'has_loyalty_program', 'has_referral_program', 'review_platform', 'total_reviews',
+        'shipping_policy', 'return_policy',
+    )
+
+    def mark_unknown(self, status: str, fetch_attempts: List[str]) -> None:
+        """The site could not be seen: every extracted field becomes None (lists empty)."""
+        self.status = status
+        self.fetch_attempts = list(fetch_attempts)
+        for name in self.UNKNOWN_WHEN_BLOCKED:
+            setattr(self, name, None)
+        self.categories, self.hero_products, self.all_products = [], [], []
+        self.promotions, self.pixels, self.trust_signals = [], [], []
+        self.payment_methods, self.platform_signals, self.social_embeds = [], [], []
+
+    @property
+    def is_analyzed(self) -> bool:
+        return self.status == "ok"
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage and serialization."""
         return {
             "domain": self.domain,
             "url": self.url,
             "scan_timestamp": self.scan_timestamp.isoformat(),
-            "platform": self.platform.value,
+            "status": self.status,
+            "fetch_attempts": self.fetch_attempts,
+            "platform": self.platform.value if self.platform else None,
             "platform_confidence": self.platform_confidence,
             "platform_signals": self.platform_signals,
             "brand_name": self.brand_name,

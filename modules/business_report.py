@@ -23,6 +23,7 @@ from pathlib import Path
 from collections import defaultdict
 
 from .models import SiteIntelligence, ChangeReport, Platform
+from .report_writer import NOT_SEEN_TEXT, not_seen_lines
 
 logger = logging.getLogger(__name__)
 
@@ -61,25 +62,30 @@ class BusinessReportGenerator:
         report_path = self.output_dir / f"{report_name}.md"
         
         lines = []
-        
+        # Only sites the tool could see take part in counts, averages, comparisons and advice
+        analyzed = [i for i in intel_list if i.is_analyzed]
+        not_seen = [i for i in intel_list if not i.is_analyzed]
+
         # 1. Executive Summary
-        lines.extend(self._generate_executive_summary(intel_list, changes))
-        
-        # 2. Market Overview
-        lines.extend(self._generate_market_overview(intel_list))
-        
+        lines.extend(self._generate_executive_summary(analyzed, changes, not_seen))
+
+        if analyzed:
+            # 2. Market Overview
+            lines.extend(self._generate_market_overview(analyzed))
+
         # 3. Competitor Profiles
-        lines.extend(self._generate_competitor_profiles(intel_list, changes, scan_history))
-        
-        # 4. Comparative Analysis
-        lines.extend(self._generate_comparative_analysis(intel_list))
-        
-        # 5. SWOT Matrix
-        lines.extend(self._generate_swot_analysis(intel_list))
-        
-        # 6. Strategic Recommendations
-        lines.extend(self._generate_strategic_recommendations(intel_list))
-        
+        lines.extend(self._generate_competitor_profiles(analyzed, changes, scan_history, not_seen))
+
+        if analyzed:
+            # 4. Comparative Analysis
+            lines.extend(self._generate_comparative_analysis(analyzed))
+
+            # 5. SWOT Matrix
+            lines.extend(self._generate_swot_analysis(analyzed))
+
+            # 6. Strategic Recommendations
+            lines.extend(self._generate_strategic_recommendations(analyzed))
+
         # 7. Appendix: Data Sources & Methodology
         lines.extend(self._generate_appendix(intel_list))
         
@@ -93,16 +99,21 @@ class BusinessReportGenerator:
     def _generate_executive_summary(
         self,
         intel_list: List[SiteIntelligence],
-        changes: Dict[str, Optional[ChangeReport]]
+        changes: Dict[str, Optional[ChangeReport]],
+        not_seen: Optional[List[SiteIntelligence]] = None
     ) -> List[str]:
-        """Generate executive summary section."""
+        """Generate executive summary section (intel_list: analysed sites only)."""
         lines = []
-        
+        not_seen = not_seen or []
+        ns = NOT_SEEN_TEXT['en' if self.is_en else 'zh']
+
         if self.is_en:
             lines.append("# Competitive Intelligence Report")
             lines.append("")
             lines.append(f"**Report Date:** {datetime.now().strftime('%B %d, %Y')}")
             lines.append(f"**Competitors Analyzed:** {len(intel_list)}")
+            for intel in not_seen:
+                lines.append(f"**{ns['short'][intel.status].capitalize()}:** {intel.url} - not analyzed")
             lines.append("")
             lines.append("---")
             lines.append("")
@@ -113,12 +124,20 @@ class BusinessReportGenerator:
             lines.append("")
             lines.append(f"**报告日期:** {datetime.now().strftime('%Y年%m月%d日')}")
             lines.append(f"**分析竞品数:** {len(intel_list)}")
+            for intel in not_seen:
+                lines.append(f"**{ns['short'][intel.status]}:** {intel.url}（未分析）")
             lines.append("")
             lines.append("---")
             lines.append("")
             lines.append("## 执行摘要")
             lines.append("")
         
+        if not intel_list:
+            lines.append("No site could be analyzed, so there are no findings." if self.is_en
+                         else "没有可分析的站点，因此没有任何发现。")
+            lines.append("")
+            return lines
+
         # Key findings
         if self.is_en:
             lines.append("### Key Findings")
@@ -258,9 +277,10 @@ class BusinessReportGenerator:
         self,
         intel_list: List[SiteIntelligence],
         changes: Dict[str, Optional[ChangeReport]],
-        scan_history: Dict[str, List[Dict]] = None
+        scan_history: Dict[str, List[Dict]] = None,
+        not_seen: Optional[List[SiteIntelligence]] = None
     ) -> List[str]:
-        """Generate individual competitor profiles."""
+        """Generate individual competitor profiles; sites not seen get their status only."""
         lines = []
         
         if self.is_en:
@@ -272,7 +292,11 @@ class BusinessReportGenerator:
         
         for intel in intel_list:
             lines.extend(self._generate_single_profile(intel, changes.get(intel.domain), scan_history))
-        
+        for intel in not_seen or []:
+            lines.extend([f"### {intel.domain}", "", f"[{intel.url}]({intel.url})", ""])
+            lines.extend(line + "  " for line in not_seen_lines(intel, 'en' if self.is_en else 'zh'))
+            lines.extend(["", "---", ""])
+
         return lines
     
     def _generate_single_profile(

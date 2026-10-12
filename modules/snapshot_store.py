@@ -238,6 +238,10 @@ class SnapshotStore:
         if previous is None:
             logger.info(f"No previous snapshot for {current.domain}")
             return None
+
+        # A blocked/unreachable scan has no data to compare (old snapshots have no status: ok)
+        if current.status != 'ok' or previous.get('status', 'ok') != 'ok':
+            return None
         
         current_data = current.to_dict()
         t = CHANGE_TEXT.get(language, CHANGE_TEXT['zh'])

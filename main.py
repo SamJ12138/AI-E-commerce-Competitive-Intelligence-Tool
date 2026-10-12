@@ -367,6 +367,8 @@ def analyze_site(
                      stage="fetch_homepage", event_name="fail")
         intel.errors.append(f"Homepage fetch failed: {error}")
         logger.warning(f"Failed to fetch {url}: {error}")
+        chain = getattr(client, 'last_chain', None) or []
+        _mark_not_seen(intel, chain, "no page returned 2xx")
         return intel
 
     intel.pages_crawled.append(url)
@@ -376,13 +378,13 @@ def analyze_site(
     # Check if this is a protected site placeholder
     is_protected_site = 'Bot protection detected' in html_str or 'strong bot protection' in html_str
     if is_protected_site:
+        # The placeholder is synthetic HTML from HttpClient, not the site: nothing on it is data.
         obs.degraded("main.py:analyze_site", "blocked", "homepage is the PROTECTED_SITES placeholder",
-                     fallback="continue extracting from placeholder HTML", stage="fetch_homepage", event_name="fail")
-        logger.info(f"Site {domain} has bot protection - providing limited analysis")
-        intel.errors.append("Site has bot protection - limited automated data available. Manual analysis recommended.")
-        intel.platform = Platform.CUSTOM
-        intel.platform_confidence = 0
-        # Still continue to provide what we can from public knowledge
+                     fallback="site reported as blocked; placeholder HTML not analysed",
+                     stage="fetch_homepage", event_name="fail")
+        intel.errors.append("Site has bot protection: only the tool's placeholder page was returned.")
+        _mark_not_seen(intel, getattr(client, 'last_chain', None) or [], "PROTECTED_SITES placeholder")
+        return intel
     
     # Step 2: Detect platform
     update_progress("Detecting platform...")
@@ -780,6 +782,15 @@ def analyze_site(
     return intel
 
 
+def _mark_not_seen(intel: SiteIntelligence, chain: list, reason: str) -> None:
+    """blocked: some branch got an HTTP answer, none usable; unreachable: no HTTP answer at all."""
+    attempts = [f"{a.get('branch')} {a.get('status') or 'no response'}" for a in chain]
+    status = 'blocked' if any(a.get('status') for a in chain) else 'unreachable'
+    intel.mark_unknown(status, attempts)
+    obs.event("fetch_homepage", "fail", kind="site_status", status=status, fetch_attempts=attempts,
+              reason=reason, error_type="blocked" if status == 'blocked' else "http")
+
+
 def _log_product(p, page_url: str) -> None:
     """One obs event per extracted product with the rule that produced its price."""
     info = getattr(p, '_obs', {}) or {}
@@ -816,7 +827,8 @@ def _log_final_fields(intel) -> None:
     """The value each report field ends up with, and the rule that set it."""
     ship, ret = intel.shipping_policy, intel.return_policy
     values = {
-        'platform': intel.platform.value,
+        'status': intel.status,
+        'platform': intel.platform.value if intel.platform else None,
         'brand_name': intel.brand_name,
         'brand_positioning': intel.brand_positioning,
         'categories': intel.categories,
@@ -837,6 +849,7 @@ def _log_final_fields(intel) -> None:
         'review_count': intel.total_reviews,
         'payment_methods': intel.payment_methods,
         'pixels_detected': [p.name for p in intel.pixels if p.detected],
+        'fetch_attempts': intel.fetch_attempts,
     }
     for name, value in values.items():
         obs.field("fields", name, value)
@@ -1006,12 +1019,16 @@ def main(
                         progress, main_task
                     )
                     _log_final_fields(intel)
-                    pressure = score_pressure(intel)
-                    obs.field("fields", "pressure_score", pressure['score'], source="derived",
-                              detail="rule-based: round(sum(weight * factor)) = "
-                                     f"{pressure['weighted_sum']}; " + "; ".join(
-                                         f"{f['key']} {f['weight']}x{f['score']} {f['inputs']}"
-                                         for f in pressure['factors']))
+                    if intel.is_analyzed:
+                        pressure = score_pressure(intel)
+                        obs.field("fields", "pressure_score", pressure['score'], source="derived",
+                                  detail="rule-based: round(sum(weight * factor)) = "
+                                         f"{pressure['weighted_sum']}; " + "; ".join(
+                                             f"{f['key']} {f['weight']}x{f['score']} {f['inputs']}"
+                                             for f in pressure['factors']))
+                    else:
+                        console.print(f"[yellow]{domain}: {intel.status} "
+                                      f"({' -> '.join(intel.fetch_attempts) or 'no fetch'}); nothing extracted[/yellow]")
 
                     # Handle monitor mode
                     if app_config.monitor_mode:
@@ -1035,7 +1052,9 @@ def main(
                     # AI-powered analysis (if enabled)
                     if not ai_analyzer:
                         obs.skip("ai", "--ai not set" if not ai else "AI requested but unavailable")
-                    if ai_analyzer:
+                    elif not intel.is_analyzed:
+                        obs.skip("ai", f"site {intel.status}: nothing to analyse")
+                    if ai_analyzer and intel.is_analyzed:
                         try:
                             t = obs.begin("ai", model=ai_model)
                             console.print(f"  [cyan]Running AI analysis for {domain}...[/cyan]")
@@ -1123,7 +1142,10 @@ def main(
             
             # Print summary statistics
             console.print(f"\n[blue]Summary:[/blue]")
-            console.print(f"  Sites analyzed: {len(intel_results)}")
+            not_seen = [i for i in intel_results if not i.is_analyzed]
+            console.print(f"  Sites analyzed: {len(intel_results) - len(not_seen)}")
+            if not_seen:
+                console.print(f"  Sites blocked or unreachable: {len(not_seen)}")
             
             shopify_count = sum(1 for i in intel_results if i.platform == Platform.SHOPIFY)
             console.print(f"  Shopify sites: {shopify_count}")

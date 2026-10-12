@@ -110,6 +110,7 @@ class HttpClient:
     def __init__(self, config: Config):
         self.config = config
         self.rate_limiter = RateLimiter(config.rate_limit_delay)
+        self.last_chain = []  # branches tried by the last fetch() (read by analyze_site)
         self.session = self._create_session()
         self.cloudscraper_session = self._create_cloudscraper() if CLOUDSCRAPER_AVAILABLE else None
         self._playwright = None
@@ -372,6 +373,7 @@ class HttpClient:
         """One 'fetch' event per fetch() call: which branch served it, status, bytes."""
         html, status, headers, error = result
         last = chain[-1] if chain else {}
+        self.last_chain = list(chain)
         obs.event(
             "fetch", "success" if (html and not error) else "fail",
             duration_ms=timer.ms(),

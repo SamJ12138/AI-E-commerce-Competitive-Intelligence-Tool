@@ -19,6 +19,53 @@ from .pressure_score import FACTOR_NAMES, RULES, format_input, score_pressure
 
 logger = logging.getLogger(__name__)
 
+BRANCH_NAMES = {
+    'en': {'requests': 'requests', 'browser': 'browser', 'cloudscraper': 'cloudscraper',
+           'placeholder': 'placeholder page', 'no response': 'no response'},
+    'zh': {'requests': 'HTTP 请求', 'browser': '浏览器', 'cloudscraper': 'cloudscraper',
+           'placeholder': '占位页', 'no response': '无响应'},
+}
+NOT_SEEN_TEXT = {
+    'en': {
+        'blocked': "⛔ blocked automated access. No page returned a 2xx response, so nothing about this "
+                   "site is known; it is left out of every comparison, average and recommendation.",
+        'unreachable': "⛔ could not be reached (no HTTP response). Nothing about this site is known; it is "
+                       "left out of every comparison, average and recommendation.",
+        'attempts': "Fetch branches tried",
+        'not_compared': "Not compared",
+        'none_compared': "No site could be compared.",
+        'status': "Status",
+        'short': {'blocked': "blocked automated access", 'unreachable': "could not be reached"},
+    },
+    'zh': {
+        'blocked': "⛔ 网站阻止了自动访问。没有任何页面返回 2xx 响应，因此对该站点一无所知，"
+                   "所有对比、平均值和建议均不包含该站点。",
+        'unreachable': "⛔ 无法访问（没有任何 HTTP 响应）。对该站点一无所知，所有对比、平均值和建议均不包含该站点。",
+        'attempts': "尝试过的抓取方式",
+        'not_compared': "未参与对比",
+        'none_compared': "没有可对比的站点。",
+        'status': "状态",
+        'short': {'blocked': "阻止了自动访问", 'unreachable': "无法访问"},
+    },
+}
+
+
+def format_attempts(attempts: List[str], language: str) -> str:
+    """['requests 403', 'cloudscraper 403'] -> 'requests (403) → cloudscraper (403)'."""
+    names = BRANCH_NAMES.get(language, BRANCH_NAMES['en'])
+    shown = []
+    for attempt in attempts:
+        branch, _, status = attempt.partition(' ')
+        shown.append(f"{names.get(branch, branch)} ({names.get(status, status)})")
+    return " → ".join(shown) or names['no response']
+
+
+def not_seen_lines(intel: SiteIntelligence, language: str) -> List[str]:
+    """Status lines for a site the tool could not see."""
+    t = NOT_SEEN_TEXT.get(language, NOT_SEEN_TEXT['en'])
+    return [f"**{t['status']}**: {t.get(intel.status, t['blocked'])}",
+            f"**{t['attempts']}**: {format_attempts(intel.fetch_attempts, language)}"]
+
 
 class ReportWriter:
     """
@@ -165,18 +212,28 @@ class ReportWriter:
         lines = []
         t = self.t
         
+        analyzed = [i for i in intel_list if i.is_analyzed]
+        not_seen = [i for i in intel_list if not i.is_analyzed]
+        ns = NOT_SEEN_TEXT[self.language]
+
         # Header
         lines.append(f"# {t['title']}")
         lines.append("")
         lines.append(f"**{t['generated_time']}**: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        lines.append(f"**{t['sites_analyzed']}**: {len(intel_list)}")
+        lines.append(f"**{t['sites_analyzed']}**: {len(analyzed)}")
+        for intel in not_seen:
+            lines.append(f"**{ns['short'][intel.status].capitalize()}**: {intel.url}")
         lines.append("")
         lines.append("---")
         lines.append("")
         
         # Per-site sections
         for intel in intel_list:
-            lines.extend(self._generate_site_section(intel, changes.get(intel.domain)))
+            if not intel.is_analyzed:
+                lines.extend([f"## 🏪 {intel.domain}", "", f"**{t['url']}**: [{intel.url}]({intel.url})", ""]
+                             + [line + "  " for line in not_seen_lines(intel, self.language)])
+            else:
+                lines.extend(self._generate_site_section(intel, changes.get(intel.domain)))
             lines.append("")
             lines.append("---")
             lines.append("")
@@ -184,7 +241,14 @@ class ReportWriter:
         # Consolidated comparison table
         lines.append(f"## 📊 {t['comparison_table']}")
         lines.append("")
-        lines.extend(self._generate_comparison_table(intel_list))
+        if analyzed:
+            lines.extend(self._generate_comparison_table(analyzed))
+        else:
+            lines.append(ns['none_compared'])
+        if not_seen:
+            lines.append("")
+            lines.append(f"{ns['not_compared']}: " + ", ".join(
+                f"{i.url} ({ns['short'][i.status]})" for i in not_seen))
         lines.append("")
         
         # Footer
@@ -602,7 +666,7 @@ class ReportWriter:
     ) -> None:
         """Write CSV export of the comparison table."""
         headers = [
-            "domain", "url", "platform", "brand_positioning",
+            "domain", "url", "status", "fetch_attempts", "platform", "brand_positioning",
             "categories", "price_min", "price_max", "price_median",
             "currency", "has_discounts", "announcement_bar",
             "has_popup", "has_email_capture", "has_loyalty",
@@ -620,7 +684,9 @@ class ReportWriter:
                 row = {
                     "domain": intel.domain,
                     "url": intel.url,
-                    "platform": intel.platform.value,
+                    "status": intel.status,
+                    "fetch_attempts": "; ".join(intel.fetch_attempts),
+                    "platform": intel.platform.value if intel.platform else None,
                     "brand_positioning": intel.brand_positioning or "",
                     "categories": "; ".join(intel.categories),
                     "price_min": intel.price_min,

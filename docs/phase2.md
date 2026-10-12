@@ -108,3 +108,26 @@ quoted page text stays in the page's own language under either `--lang`. Seen bu
 ("Harbor Supply Co.HomeShop...").
 
 Fixture scores: shopify_basic 12/1/3 -> 16/0/0, woocommerce_promo 10/1/5 -> 16/0/0.
+
+## Batch 4 - a blocked site is unknown, not False
+
+- `SiteIntelligence.status`: `ok`, `blocked` (some fetch branch got an HTTP answer, none was
+  usable) or `unreachable` (no HTTP answer at all; not in the brief, added so a DNS or connection
+  failure is not reported as "blocked automated access"). `fetch_attempts` lists the branches
+  tried, e.g. `requests 403`, `cloudscraper 403`. For any status but `ok`, `mark_unknown()` sets
+  every extracted field to None (lists empty): no platform, no currency, no booleans.
+- The branch list comes from `HttpClient.last_chain`, set where each fetch is already logged.
+  The fetch chain itself is unchanged (owner decision A3).
+- The `PROTECTED_SITES` placeholder (synthetic HTML that `HttpClient` returns with status 200 for
+  lululemon/nike/adidas after the browser and cloudscraper fail) is now reported as `blocked`
+  (`browser 403 -> cloudscraper 403 -> placeholder 200`) instead of being analysed as if it were
+  the site. The placeholder is still produced; only its text is no longer read as data.
+- report.csv has `status` and `fetch_attempts` columns; a blocked row has empty cells.
+- report.md and business_report.md state "blocked automated access" (or "could not be reached")
+  with the branches tried, and leave the site out of the comparison table, the pressure score,
+  insights, averages, percentages, SWOT and recommendations. "Competitors Analyzed" counts only
+  analysed sites. With no analysed site the business report says so and has no findings.
+- No change report is computed from or against a blocked scan; the AI step skips blocked sites.
+
+Fixture scores: blocked 10/0/6 -> 16/0/0 and blocked_render_js 10/0/6 -> 16/0/0 (status=blocked,
+every field null); shopify_basic and woocommerce_promo stay 16/0/0.

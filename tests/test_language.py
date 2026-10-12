@@ -15,6 +15,7 @@ import pytest
 from modules.business_report import BusinessReportGenerator
 from modules.report_writer import ReportWriter
 from modules.snapshot_store import SnapshotStore
+from tests.conftest import analyze_store
 
 CJK = re.compile(r"[　-〿㐀-鿿＀-￯]")
 WORD = re.compile(r"[A-Za-z][A-Za-z'\-]+")
@@ -23,7 +24,7 @@ ALLOWED_NAMES = {"AI", "LLM", "Ollama", "USD", "Shopify", "WooCommerce", "BigCom
                  "Pixel", "TikTok", "Pinterest", "Tag", "Snapchat", "PayPal", "Visa", "Mastercard",
                  "American", "Express", "Discover", "Klarna", "Afterpay", "Affirm", "Shop", "Pay",
                  "Apple", "Amazon", "Venmo", "Sezzle", "Yotpo", "Judge", "me", "robots", "txt", "FAQ",
-                 "CSV", "JSON", "HTML", "URL", "SWOT"}
+                 "CSV", "JSON", "HTML", "URL", "SWOT", "HTTP", "cloudscraper"}
 
 
 def _write_all(intel_list, changes, lang, out):
@@ -35,7 +36,7 @@ def _write_all(intel_list, changes, lang, out):
 
 @pytest.fixture(scope="module")
 def scans(analyzed, tmp_path_factory):
-    """Both stores plus a change report against a doctored previous scan of each."""
+    """Both stores with a change report against a doctored previous scan, plus the blocked store."""
     store = SnapshotStore(str(tmp_path_factory.mktemp("db") / "intel.db"))
     intel_list = [analyzed["shopify_basic"], analyzed["woocommerce_promo"]]
     previous = {}
@@ -44,13 +45,14 @@ def scans(analyzed, tmp_path_factory):
         old["price_max"] = (intel.price_max or 0) + 10
         old["categories"] = old["categories"] + ["Old Category"]
         old["scan_timestamp"] = "2026-01-01T00:00:00"
-        previous[intel.domain] = old
-    return intel_list, store, previous
+        previous[intel.url] = old
+    return intel_list + [analyze_store("blocked")[0]], store, previous
 
 
 def _changes(scans, lang):
     intel_list, store, previous = scans
-    return {i.domain: store.compute_changes(i, previous[i.domain], language=lang) for i in intel_list}
+    return {i.domain: store.compute_changes(i, previous[i.url], language=lang)
+            for i in intel_list if i.url in previous}
 
 
 def _site_tokens(intel_list):
@@ -79,6 +81,7 @@ def test_zh_reports_contain_no_english_boilerplate(scans, tmp_path):
     for name in ("report.md", "business_report.md"):
         text = files[name]
         text = re.sub(r"https?://\S+", " ", text)          # URLs
+        text = re.sub(r"\b\dxx\b", " ", text)              # status classes (2xx)
         text = re.sub(r"“[^”]*”|`[^`]*`", " ", text)        # quoted page text, code
         words = sorted({w for w in WORD.findall(text) if w not in allowed})
         assert not words, f"{name} (--lang zh) contains English: {words[:30]}"
