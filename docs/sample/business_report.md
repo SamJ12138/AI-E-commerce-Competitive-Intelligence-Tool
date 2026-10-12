@@ -97,7 +97,9 @@ What to compare against these 2 sites:
 
 - **Data collection:** 12 pages fetched from 3 sites; robots.txt was respected.
   - 127.0.0.1:8701: 6 pages, served by requests (6 responses)
+  - 127.0.0.1:8701: product sample: 2 products from the homepage (2)
   - 127.0.0.1:8702: 6 pages, served by requests (6 responses)
+  - 127.0.0.1:8702: product sample: 2 products from the homepage (2)
   - 127.0.0.1:8703: blocked automated access (requests (403) → requests with the tool's own User-Agent (403) → cloudscraper (403))
 - **JavaScript rendering:** not used
 - **LLM step:** The LLM step was not run (`--ai` not given); all text is rule-based.

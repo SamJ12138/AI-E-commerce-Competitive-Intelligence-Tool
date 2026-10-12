@@ -10,6 +10,7 @@ import logging
 from typing import List, Dict, Optional
 
 from .models import SiteIntelligence, ChangeReport, Platform
+from .product_sample import describe as describe_sample
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ TEXT = {
             'url': "Analyzed URL: {url}", 'time': "Scan time: {time}",
             'platform': "Platform detected: {platform} (confidence {confidence:.0%})",
             'price': "Price range: ${lo:.2f} - ${hi:.2f}",
+            'sample': "Product sample: {text}",
             'threshold': "Free-shipping threshold: ${threshold:.0f}",
             'returns': "Return window: {days} days", 'reviews': "Reviews: {count}",
             'pages': "Pages analyzed: {count}", 'errors': "Fetch warnings: {count} pages had problems",
@@ -133,6 +135,7 @@ TEXT = {
             'url': "分析网址: {url}", 'time': "扫描时间: {time}",
             'platform': "平台检测: {platform} (置信度 {confidence:.0%})",
             'price': "价格区间: ${lo:.2f} - ${hi:.2f}",
+            'sample': "产品样本: {text}",
             'threshold': "免运费门槛: ${threshold:.0f}",
             'returns': "退货期限: {days}天", 'reviews': "评论数量: {count}",
             'pages': "分析页面数: {count}", 'errors': "采集警告: {count}个页面有问题",
@@ -291,6 +294,8 @@ class InsightGenerator:
         ]
         if intel.price_min and intel.price_max:
             evidence.append(e['price'].format(lo=intel.price_min, hi=intel.price_max))
+        if intel.product_sample:
+            evidence.append(e['sample'].format(text=describe_sample(intel.product_sample, self.language)))
         threshold = getattr(intel.shipping_policy, 'free_shipping_threshold', None) if intel.shipping_policy else None
         if threshold is not None:
             evidence.append(e['threshold'].format(threshold=threshold))

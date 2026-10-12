@@ -393,10 +393,14 @@ From `docs/real-corpus/scores-after-batch4.md`. Each occurs on one store only, o
 - **allbirds / rastaclat: Google Pay missing.** It is declared only on product pages
   (`<link rel="buy">`), and those runs skip product pages once 50 products come from collection
   cards (`max_products`). By design of the cap.
+  *allbirds resolved in Phase 5 Batch 1* (stratified sampling leaves room for the product pages);
+  rastaclat not rerun.
 - **allbirds / deathwishcoffee: ground-truth products not reported.** Both stores reach
   `max_products` (50) from the first collections; the colorways / mug picked for the ground truth
   are not in that sample. The 50 reported allbirds products carry plausible prices. Sampling, not
   extraction.
+  *Resolved in Phase 5 Batch 1* (section 10): all four allbirds products and all four
+  deathwishcoffee products are in the sample; two allbirds products have no price (section 10).
 - **brooklinen: no products.** Collection grids and product prices are rendered by JavaScript (no
   price in the static HTML, no JSON-LD; prices only in the product JSON), and the homepage links few
   product pages. `--render-js` was not used (default settings).
@@ -437,3 +441,22 @@ From `docs/real-corpus/scores.md` (barefootbuttons and beardbrand runs of 2026-1
   order; free shipping and early access) uses none of the loyalty words the patterns accept.
 - **beardbrand: products 2 of 4.** Black Sails and Old Money Beard Oil are not in the 14 products the
   run reported (sampling; not checked further).
+
+## 10. Phase 5 Batch 1: stratified product sampling
+
+From `docs/real-corpus/scores.md` (allbirds and deathwishcoffee runs of 2026-10-12, one each).
+
+- **The cap hid more than products.** allbirds' first collection page carried 194 product cards; the
+  report listed 50 of them but computed the price range over all 194, and every product page and
+  other collection was skipped. With at most 10 per collection the run read 5 collections and 5
+  product pages (13 pages instead of 4), and Google Pay (declared only on product pages) is found.
+- **deathwishcoffee's mug was never reachable by a bigger cap.** Its product page and the mugs
+  collection were beyond `max_pages` (57 homepage links for 19 places). It is a product card on the
+  homepage, which the tool fetched and never read for products. The homepage's priced product
+  cards are now one source of the sample (at most 10, like a collection): 4 of 4 products.
+- **allbirds: product pages give no price.** Men's Runner NZ Slip On and Women's Canvas Cruiser are
+  now sampled from their product pages, with price null: the price is in
+  `meta property="product:price:amount"` and a JSON-LD `ProductGroup` (top-level `offers.price`),
+  and the product-page extractor falls back to `<body>` as the price block and finds nothing. Filed
+  for Batch 2.
+

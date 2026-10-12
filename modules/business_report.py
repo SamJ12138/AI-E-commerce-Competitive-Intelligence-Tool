@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from .models import SiteIntelligence, ChangeReport
+from .product_sample import describe as describe_sample
 from .report_writer import BRANCH_NAMES, NOT_SEEN_TEXT, format_attempts, not_seen_lines
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ T = {
         'robots_no': "robots.txt was ignored (`--ignore-robots`).",
         'robots_unknown': "robots.txt handling not recorded for this run.",
         'm_site': "  - {site}: {pages} pages, served by {branches}",
+        'm_sample': "  - {site}: product sample: {text}",
         'responses': "{branch} ({n} responses)",
         'm_site_not_seen': "  - {site}: {status} ({attempts})",
         'm_js': "- **JavaScript rendering:** {text}",
@@ -221,6 +223,7 @@ T = {
         'robots_no': "忽略了 robots.txt（`--ignore-robots`）。",
         'robots_unknown': "本次运行未记录 robots.txt 的处理方式。",
         'm_site': "  - {site}: {pages}个页面，抓取方式 {branches}",
+        'm_sample': "  - {site}: 产品样本：{text}",
         'responses': "{branch}（{n}次响应）",
         'm_site_not_seen': "  - {site}: {status}（{attempts}）",
         'm_js': "- **JavaScript 渲染:** {text}",
@@ -534,6 +537,9 @@ class BusinessReportGenerator:
             shown = self.t['list_sep'].join(t['responses'].format(branch=names.get(b, b), n=c)
                                             for b, c in branches.items()) or t['na']
             lines.append(t['m_site'].format(site=site_label(intel), pages=len(intel.pages_crawled), branches=shown))
+            if intel.product_sample:
+                lines.append(t['m_sample'].format(site=site_label(intel),
+                                                  text=describe_sample(intel.product_sample, self.language)))
         for intel in not_seen:
             lines.append(t['m_site_not_seen'].format(site=site_label(intel), status=ns['short'][intel.status],
                                                      attempts=format_attempts(intel.fetch_attempts, self.language)))

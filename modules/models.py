@@ -203,6 +203,7 @@ class SiteIntelligence:
     categories: List[str] = field(default_factory=list)
     hero_products: List[Product] = field(default_factory=list)
     all_products: List[Product] = field(default_factory=list)
+    product_sample: Dict[str, int] = field(default_factory=dict)  # ProductSample.summary()
     has_bundles: bool = False
     has_subscriptions: bool = False
     
@@ -264,6 +265,7 @@ class SiteIntelligence:
         for name in self.UNKNOWN_WHEN_BLOCKED:
             setattr(self, name, None)
         self.categories, self.hero_products, self.all_products = [], [], []
+        self.product_sample = {}
         self.promotions, self.pixels, self.trust_signals = [], [], []
         self.payment_methods, self.platform_signals, self.social_embeds = [], [], []
 
@@ -292,6 +294,7 @@ class SiteIntelligence:
             "categories": self.categories,
             "hero_products": [p.to_dict() for p in self.hero_products],
             "all_products": [p.to_dict() for p in self.all_products],
+            "product_sample": self.product_sample,
             "has_bundles": self.has_bundles,
             "has_subscriptions": self.has_subscriptions,
             "currency": self.currency,
@@ -372,6 +375,7 @@ class Config:
     ignore_robots: bool = False
     timeout: int = 30
     max_products: int = 50
+    max_products_per_collection: int = 10  # also for the homepage's cards and products.json
     max_pages: int = 20
     language: str = "zh"
     rate_limit_delay: float = 1.5  # seconds between requests to same domain

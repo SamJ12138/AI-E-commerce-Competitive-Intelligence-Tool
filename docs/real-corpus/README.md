@@ -57,8 +57,9 @@ python scripts/real_corpus.py run --out-root <dir>       # one main.py run per s
 python scripts/real_corpus.py score --out-root <dir> --md docs/real-corpus/scores.md
 ```
 
-`scores.md` is the current table; `scores-baseline.md` (before any fix) and
-`scores-after-batch4.md` (pfrankmd still in the corpus) are kept as history.
+`scores.md` is the current table; `scores-baseline.md` (before any fix),
+`scores-after-batch4.md` (pfrankmd still in the corpus) and `scores-phase4.md` (end of Phase 4) are
+kept as history.
 
 `run` uses default settings except that the cloudscraper fallback is switched off (real-site runs
 never take the cloudscraper path), so a 403 ends on `requests 403`. `score` writes per store and

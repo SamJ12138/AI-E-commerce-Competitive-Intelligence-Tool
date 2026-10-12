@@ -18,6 +18,11 @@ max_pages: 20
 # skipped and the policy pages are still read (--max-products).
 max_products: 50
 
+# Products taken from one collection page, so that one big collection does not fill the whole
+# sample; the homepage's product cards and products.json count as one collection each
+# (--max-per-collection).
+max_products_per_collection: 10
+
 # Render pages in a headless browser (--render-js). Needs `playwright install chromium`.
 render_js: false
 

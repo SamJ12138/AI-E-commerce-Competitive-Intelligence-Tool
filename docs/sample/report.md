@@ -1,6 +1,6 @@
 # E-commerce Competitive Intelligence Report
 
-**Generated**: 2026-10-12 15:07
+**Generated**: 2026-10-12 17:32
 **Sites Analyzed**: 2
 **Blocked automated access**: http://127.0.0.1:8703
 
@@ -47,9 +47,10 @@
 ### 📋 Data Evidence
 
 - Analyzed URL: http://127.0.0.1:8701
-- Scan time: 2026-10-12 15:07
+- Scan time: 2026-10-12 17:32
 - Platform detected: Shopify (confidence 95%)
 - Price range: $24.00 - $39.00
+- Product sample: 2 products from the homepage (2)
 - Free-shipping threshold: $50
 - Return window: 30 days
 - Pages analyzed: 6
@@ -115,9 +116,10 @@
 ### 📋 Data Evidence
 
 - Analyzed URL: http://127.0.0.1:8702
-- Scan time: 2026-10-12 15:07
+- Scan time: 2026-10-12 17:32
 - Platform detected: WooCommerce (confidence 95%)
 - Price range: $28.00 - $48.00
+- Product sample: 2 products from the homepage (2)
 - Free-shipping threshold: $75
 - Return window: 14 days
 - Pages analyzed: 6

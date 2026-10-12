@@ -525,9 +525,18 @@ def analyze_site(
     pages = discover_pages(url, client, robots_checker, config, platform=intel.platform, homepage_soup=soup)
     obs.end("discovery", t, pages=len(pages))
 
-    all_products = []
+    # Stratified sample: at most max_products_per_collection from each collection page, from the
+    # homepage's own product cards and from products.json; max_products in total (product_sample.py).
+    from modules.product_sample import ProductSample
+    sample = ProductSample(config.max_products, config.max_products_per_collection)
     t_products = obs.begin("products")
-    
+
+    # The homepage is already fetched: its priced product cards (featured products) are a source.
+    home_cards = [p for p in extract_products(soup, url, intel.platform, 'home')
+                  if p.price and p.price.current_price]
+    for p in sample.add(home_cards, url, 'home'):
+        _log_product(p, url)
+
     # For Shopify sites, try the /products.json API (every product with its compare-at price),
     # but only when the homepage links a JSON product endpoint; a guess is a likely 404.
     if intel.platform == Platform.SHOPIFY and not products_json_linked(soup, url):
@@ -545,13 +554,11 @@ def analyze_site(
                     import json
                     data = json.loads(html_content)
                     if 'products' in data:
-                        for prod_data in data['products'][:config.max_products]:
-                            from modules.product_extractor import ProductExtractor
-                            extractor = ProductExtractor(Platform.SHOPIFY)
-                            p = extractor._parse_shopify_product(prod_data, url)
-                            if p:
-                                all_products.append(p)
-                                _log_product(p, products_json_url)
+                        from modules.product_extractor import ProductExtractor
+                        extractor = ProductExtractor(Platform.SHOPIFY)
+                        parsed = [extractor._parse_shopify_product(d, url) for d in data['products']]
+                        for p in sample.add([p for p in parsed if p], products_json_url, 'feed'):
+                            _log_product(p, products_json_url)
                         logger.info(f"Extracted {len(data['products'])} products from products.json")
                 except json.JSONDecodeError:
                     obs.swallowed("main.py:analyze_site", error_type="parse", fallback="no products.json products",
@@ -567,14 +574,12 @@ def analyze_site(
         
     # Analyze discovered pages. max_products caps the products, not the pages: once it is reached,
     # further collection / product pages are skipped and the policy pages are still read.
-    from modules.product_extractor import product_key
-    product_keys = {product_key(p.url) for p in all_products}
     for page_url, page_type in pages[:config.max_pages]:
         if page_url == url:  # Skip homepage, already processed
             continue
-        if page_type in ('collection', 'product') and len(product_keys) >= config.max_products:
+        if page_type in ('collection', 'product') and sample.full:
             obs.event("products", "skip", kind="page_skipped", url=page_url, page_type=page_type,
-                      reason="max_products reached", products=len(product_keys))
+                      reason="max_products reached", products=len(sample.products))
             continue
         
         update_progress(f"Analyzing {page_type} page...")
@@ -596,8 +601,8 @@ def analyze_site(
         # Extract products from collection/product pages
         if page_type in ('collection', 'product', 'home'):
             products = extract_products(page_soup, page_url, intel.platform, page_type)
-            all_products.extend(products)
-            product_keys.update(product_key(p.url) for p in products)
+            for p in sample.add(products, page_url, page_type):
+                _log_product(p, page_url)
 
         # Product pages declare wallets the homepage may not (<link rel="buy" payment=...>)
         if page_type == 'product':
@@ -610,9 +615,7 @@ def analyze_site(
                 intel.payment_methods = sorted(merged)
                 obs.apply('payment_methods', intel.payment_methods,
                           f"added {sorted(added)} declared on product page {page_url}", stage="products")
-            for p in products:
-                _log_product(p, page_url)
-            
+
             # Check for bundles/subscriptions
             for p in products:
                 if p.is_bundle:
@@ -673,18 +676,14 @@ def analyze_site(
     # Step 8: Process products and calculate stats
     update_progress("Processing products...")
     
-    # Deduplicate products by URL path (a card links '/product/x/', the page itself is '/product/x')
-    seen_urls = set()
-    unique_products = []
-    for p in all_products:
-        key = product_key(p.url)
-        if key not in seen_urls:
-            seen_urls.add(key)
-            unique_products.append(p)
-    
-    intel.all_products = unique_products[:config.max_products]
+    # The sample is already deduplicated by URL path (a card links '/product/x/', the page is
+    # '/product/x') and capped; price statistics are over the sample.
+    unique_products = sample.products
+    intel.all_products = list(unique_products)
     intel.hero_products = unique_products[:3]
-    
+    intel.product_sample = sample.summary()
+    obs.event("products", "success", kind="product_sample", **intel.product_sample)
+
     # Calculate price statistics
     if unique_products:
         price_min, price_max, price_median, currency = calculate_price_stats(unique_products)
@@ -889,6 +888,7 @@ CONFIG_KEYS = {
     'timeout': Config.timeout,
     'max_pages': Config.max_pages,
     'max_products': Config.max_products,
+    'max_products_per_collection': Config.max_products_per_collection,
     'render_js': False,
     'ignore_robots': False,
     'db_path': Config.db_path,
@@ -902,6 +902,8 @@ CONFIG_KEYS = {
 @click.option('--ignore-robots', is_flag=True, default=False, help='Ignore robots.txt restrictions')
 @click.option('--timeout', '-t', type=int, default=None, help='Request timeout in seconds (default 30)')
 @click.option('--max-products', type=int, default=None, help='Max products to extract per site (default 50)')
+@click.option('--max-per-collection', 'max_per_collection', type=int, default=None,
+              help='Max products sampled from one collection page (default 10)')
 @click.option('--max-pages', type=int, default=None, help='Max pages to crawl per site (default 20)')
 @click.option('--monitor', '-m', is_flag=True, default=False, help='Enable monitor mode for change detection')
 @click.option('--config', '-c', default=None, help='Path to config.yaml file')
@@ -916,6 +918,7 @@ def main(
     ignore_robots: bool,
     timeout: int,
     max_products: int,
+    max_per_collection: int,
     max_pages: int,
     monitor: bool,
     config: Optional[str],
@@ -944,6 +947,7 @@ def main(
     # Load configuration
     t_load = obs.begin("load", sites_file=sites, outdir=outdir, render_js=render_js,
                        ignore_robots=ignore_robots, timeout=timeout, max_products=max_products,
+                       max_per_collection=max_per_collection,
                        max_pages=max_pages, monitor=monitor, config=config, ai=ai, ai_model=ai_model,
                        lang=lang)
     import modules as modules_pkg
@@ -969,6 +973,7 @@ def main(
         ignore_robots=ignore_robots or bool(setting('ignore_robots')),
         timeout=int(setting('timeout', timeout)),
         max_products=int(setting('max_products', max_products)),
+        max_products_per_collection=int(setting('max_products_per_collection', max_per_collection)),
         max_pages=int(setting('max_pages', max_pages)),
         monitor_mode=monitor,
         db_path=setting('db_path'),
@@ -978,6 +983,7 @@ def main(
     obs.event("load", "success", kind="config_resolved", config_keys=sorted(config_data),
               render_js=app_config.render_js, ignore_robots=app_config.ignore_robots,
               timeout=app_config.timeout, max_products=app_config.max_products,
+              max_products_per_collection=app_config.max_products_per_collection,
               max_pages=app_config.max_pages, db_path=app_config.db_path,
               rate_limit_delay=app_config.rate_limit_delay,
               config_keys_ignored=sorted(set(config_data) - set(CONFIG_KEYS)))

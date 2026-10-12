@@ -66,6 +66,7 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 | `--ai-model` | The Ollama model for `--ai` (default `qwen2.5:7b`). |
 | `--monitor` | Compare each store with its previous scan and report what changed. |
 | `--max-pages`, `--max-products` | Pages read and products collected per store (defaults 20 and 50). |
+| `--max-per-collection` | Products taken from one collection page (default 10), so one big collection does not fill the sample. |
 | `--timeout` | Seconds to wait for one response (default 30). |
 | `--config` | A settings file; copy `config.example.yaml` to `config.yaml`, which documents every key. |
 | `--ignore-robots` | Ignore robots.txt rules and Crawl-delay. Only for sites you own or have permission to crawl. |
@@ -121,15 +122,15 @@ cloudscraper switched off. Per field, out of 8 stores
 |---|---|---|---|---|
 | status (ok / blocked) | 8 | 0 | 0 | 0 |
 | platform | 8 | 0 | 0 | 0 |
-| products (price and compare-at price of 4 known products) | 4 | 3 | 0 | 1 |
+| products (price and compare-at price of 4 known products) | 5 | 2 | 0 | 1 |
 | free-shipping threshold | 7 | 0 | 0 | 1 |
 | return window (days) | 6 | 0 | 0 | 2 |
 | free returns | 4 | 0 | 4 | 0 |
-| payment methods | 6 | 2 | 0 | 0 |
+| payment methods | 7 | 1 | 0 | 0 |
 | review platform | 8 | 0 | 0 | 0 |
 | loyalty program | 5 | 0 | 3 | 0 |
 | email capture | 6 | 0 | 2 | 0 |
-| **total (80)** | **62** | **5** | **9** | **4** |
+| **total (80)** | **64** | **3** | **9** | **4** |
 
 "Missing" means the store states a value and the tool reported none; "mismatch" means the tool
 reported a wrong value, including a definite answer where the store states nothing. The blocked
@@ -222,14 +223,17 @@ venv\Scripts\python -m pytest -q
   suite and refuses the commit if a test fails. CI runs the same suite on Ubuntu and Windows
   (`.github/workflows/ci.yml`).
 - Change history and findings: [docs/phase2.md](docs/phase2.md), [docs/phase3.md](docs/phase3.md),
-  [docs/phase4.md](docs/phase4.md), [docs/observations.md](docs/observations.md).
+  [docs/phase4.md](docs/phase4.md), [docs/phase5.md](docs/phase5.md),
+  [docs/observations.md](docs/observations.md).
 
 ## Limitations
 
 - Without `--render-js` only the HTML the server sends is read; stores that draw prices with
   JavaScript report no products (one of the eight real stores).
-- Each store is sampled: at most 20 pages and 50 products by default. The products reported are a
-  sample, not the catalogue.
+- Each store is sampled: at most 20 pages and 50 products by default, and at most 10 products from
+  any one collection page (the homepage's product cards and Shopify's products.json count as one
+  collection each). The price range is over that sample, not the catalogue; `report.md` and
+  `business_report.md` say how many products came from how many collections.
 - Extraction is pattern-based and written for English-language pages. A phrasing the patterns do
   not know is missed (one store's "full refund up to 120 days"), and some yes/no fields read
   silence as "no" (free returns) or match unrelated text (a privacy notice mentioning loyalty
