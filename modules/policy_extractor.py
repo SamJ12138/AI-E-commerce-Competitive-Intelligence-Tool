@@ -40,10 +40,14 @@ class PolicyExtractor:
         r'\$(\d+)\s+(or\s+more\s+)?for\s+free\s+shipping',
         r'spend\s+\$(\d+).*free\s+shipping',
         # "Free Fast(ish) Shipping (USPS Ground, 2-5 business days) on orders $75+"
-        r'free\s+(?:[\w()\'-]+\s+){0,2}shipping\s*(?:\([^)]{0,80}\)\s*)?on\s+orders?\s+(?:over\s+|of\s+)?\$(\d+)',
+        # "Free luxury shipping on US orders $100+" (beardbrand)
+        r'free\s+(?:[\w()\'-]+\s+){0,2}shipping\s*(?:\([^)]{0,80}\)\s*)?on\s+(?:[\w-]+\s+){0,2}orders?\s+'
+        r'(?:over\s+|of\s+)?\$(\d+)',
         # "If you spend over $50 USD, we'll hook you up with free shipping"
         r'spend\s+(?:over\s+|more\s+than\s+)\$(\d+)[^.!?]{0,80}free\s+shipping',
         r'free\s+shipping\s+on\s+all\s+orders',
+        # "Luxury shipping is free for US domestic orders over $100" (beardbrand)
+        r'shipping\s+is\s+free\s+(?:for|on)\s+(?:[\w-]+\s+){0,3}orders?\s+(?:over|above|of)\s+\$(\d+)',
     ]
     
     # Return days patterns
@@ -54,7 +58,16 @@ class PolicyExtractor:
         r'returns?\s+accepted\s+(within\s+)?(\d+)\s*days?',
         r'(\d+)\s*[-–]?\s*day\s+money[- ]back',
         r'(?:return|refund)s?\b[^.]{0,40}?\b(?:lasts|is|of)\s+(\d+)\s*days?',
-        r'within\s+(\d+)\s*days?\s+(?:of|from|after)\s+(?:your\s+)?(?:purchase|delivery|receipt)',
+        # "within 14 days from delivery", in a sentence about returns ("ship within 3 days of
+        # purchase" is not a return window)
+        r'(?:return|refund|exchange)[^.]{0,80}?\bwithin\s+(\d+)\s*days?\s+(?:of|from|after)\s+(?:your\s+)?'
+        r'(?:the\s+)?(?:purchase|delivery|receipt)',
+        # "can be returned or exchanged within 365 days" (brooklinen)
+        r'(?:returned|exchanged|refunded)(?:\s+or\s+(?:returned|exchanged|refunded))?\s+within\s+(\d+)\s*days?',
+        # "full refunds ... (usually up to 120 days from the date of purchase)" (beardbrand)
+        r'(?:refunds?|returns?)\b[^.]{0,100}?\bup\s+to\s+(\d+)\s*days?\s+(?:from|of|after)\b',
+        r'\bwithin\s+(\d+)\s*days?\s+(?:of|from|after)\s+(?:your\s+)?(?:purchase|delivery|receipt)'
+        r'[^.]{0,80}?(?:return|refund|exchange)',
     ]
     
     # Region patterns

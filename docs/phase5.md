@@ -98,3 +98,16 @@ end of the batch.
 - On the saved policy pages: allbirds, brooklinen, rastaclat and porterandyork False,
   deathwishcoffee None, beardbrand None on the returns page and True on the FAQ: the ground truth
   for all six.
+
+### beardbrand, brooklinen: return-window and free-shipping phrasing
+
+- Return window: "can be returned or exchanged within 365 days" (brooklinen), "full refunds ...
+  (usually up to 120 days from the date of purchase)" and "Full refund up to 120 days from order"
+  (beardbrand). "within N days of purchase / from delivery" now counts only in a sentence about a
+  return, refund or exchange: "Orders ship within 3 days of purchase" used to be read as a 3-day
+  return window.
+- Free-shipping threshold: "Luxury shipping is free for US domestic orders over $100" and "Free
+  luxury shipping on US orders $100+" (beardbrand).
+- RED: `tests/test_policy_phrasing.py` 8 of 11 failed (three are unchanged controls). On the saved
+  pages: brooklinen's returns page 365 days, beardbrand's returns page 120 days and FAQ $100; the
+  other stores' pages give the same values as before.
