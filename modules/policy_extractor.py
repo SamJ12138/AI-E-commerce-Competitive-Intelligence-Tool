@@ -49,6 +49,8 @@ class PolicyExtractor:
         r'(\d+)\s*[-–]?\s*day\s+return\s+policy',
         r'returns?\s+accepted\s+(within\s+)?(\d+)\s*days?',
         r'(\d+)\s*[-–]?\s*day\s+money[- ]back',
+        r'(?:return|refund)s?\b[^.]{0,40}?\b(?:lasts|is|of)\s+(\d+)\s*days?',
+        r'within\s+(\d+)\s*days?\s+(?:of|from|after)\s+(?:your\s+)?(?:purchase|delivery|receipt)',
     ]
     
     # Region patterns

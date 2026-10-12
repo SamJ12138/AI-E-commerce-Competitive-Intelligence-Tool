@@ -124,12 +124,27 @@ class PromoExtractor:
         'input[placeholder*="Email"]',
     ]
     
-    # Loyalty/referral indicators
-    LOYALTY_KEYWORDS = [
-        'rewards', 'loyalty', 'points', 'earn points',
-        'vip', 'member', 'membership', 'loyalty program',
-        'reward points', 'smile.io', 'yotpo loyalty'
+    # Loyalty program wording in the page text (whole words; 'member', 'points' and 'vip' alone
+    # match "remember", "pain points" and too much else)
+    LOYALTY_PATTERNS = [
+        r'\bloyalty\b',
+        r'\brewards? (?:program|club|points?)\b',
+        r'\b(?:earn|redeem|collect)(?: \d+)? points?\b',
+        r'\breward points\b',
+        r'\bvip (?:club|program|rewards|tier)\b',
+        r'\b\w+ rewards\b(?=.{0,80}\bpoints?\b)',
     ]
+    # Loyalty apps by their script/embed signatures. Review apps (Yotpo reviews, Judge.me,
+    # Stamped reviews, Okendo reviews) are not loyalty programs.
+    LOYALTY_PLATFORMS = {
+        'Smile.io': ['smile.io', 'sweettooth.io', 'smile-ui-container'],
+        'LoyaltyLion': ['loyaltylion'],
+        'Yotpo Loyalty': ['yotpo-loyalty', 'loyalty.yotpo.com', 'swellrewards', 'swell-rewards'],
+        'Stamped Loyalty': ['stamped.io/widget/loyalty', 'stamped-rewards'],
+        'Rivo': ['rivo.io'],
+        'Growave': ['growave'],
+        'Okendo Loyalty': ['okendo-loyalty'],
+    }
     
     REFERRAL_KEYWORDS = [
         'refer a friend', 'referral', 'refer and earn',
@@ -354,24 +369,25 @@ class PromoExtractor:
         return False
     
     def _detect_loyalty(self, soup: BeautifulSoup, html_str: str) -> bool:
-        """Detect loyalty program indicators."""
-        text_lower = soup.get_text().lower()
+        """Detect a loyalty program: program wording in the text, or a loyalty app's signature."""
+        text_lower = ' '.join(soup.get_text(' ').lower().split())
 
-        for keyword in self.LOYALTY_KEYWORDS:
-            if keyword in text_lower:
-                obs.note('has_loyalty', True, 'regex', f"LOYALTY_KEYWORDS substring {keyword!r} in page text",
-                         snippet=obs.snippet(text_lower, keyword))
+        for pattern in self.LOYALTY_PATTERNS:
+            match = re.search(pattern, text_lower)
+            if match:
+                obs.note('has_loyalty', True, 'regex', f"LOYALTY_PATTERNS {pattern!r} matched {match.group(0)!r}",
+                         snippet=obs.snippet(text_lower, match.group(0)))
                 return True
 
-        # Check for loyalty platform scripts
-        loyalty_platforms = ['smile.io', 'yotpo', 'loyaltylion', 'stamped.io/widget/loyalty']
-        for platform in loyalty_platforms:
-            if platform in html_str.lower():
-                obs.note('has_loyalty', True, 'regex', f"loyalty platform substring {platform!r} in raw html",
-                         snippet=obs.snippet(html_str, platform))
-                return True
+        html_lower = html_str.lower()
+        for platform, signatures in self.LOYALTY_PLATFORMS.items():
+            for sig in signatures:
+                if sig in html_lower:
+                    obs.note('has_loyalty', True, 'regex', f"loyalty app {platform}: {sig!r} in raw html",
+                             snippet=obs.snippet(html_str, sig))
+                    return True
 
-        obs.note('has_loyalty', False, 'default', "no LOYALTY_KEYWORDS or loyalty platform substring")
+        obs.note('has_loyalty', False, 'default', "no loyalty wording or loyalty app signature")
         return False
     
     def _detect_referral(self, soup: BeautifulSoup, html_str: str) -> bool:
@@ -517,33 +533,48 @@ class PromoExtractor:
         
         return list(set(embeds))
     
+    GA_ID = r'\b(G-[A-Z0-9]{6,12}|UA-\d{4,10}-\d{1,4})\b'
+    GA_SCRIPT_PATTERNS = [
+        (r"gtag\(\s*['\"]config['\"]\s*,\s*['\"]" + GA_ID[2:-2] + r"['\"]", "gtag('config', ID) call"),
+        (r"ga\(\s*['\"]create['\"]\s*,\s*['\"](UA-\d{4,10}-\d{1,4})['\"]", "ga('create', ID) call"),
+        (r"google-analytics\.com/(?:analytics|ga)\.js", "analytics.js loader"),
+    ]
+
+    def _find_google_analytics(self, html_str: str):
+        """(True, id or None, evidence) when a script loads or configures GA, else None."""
+        soup = BeautifulSoup(html_str, 'html.parser')
+        for script in soup.find_all('script'):
+            src = script.get('src') or ''
+            m = re.search(r'googletagmanager\.com/gtag/js\?id=' + self.GA_ID, src)
+            if m:
+                return True, m.group(1), f"gtag.js loader src {src[:100]!r}"
+            if re.search(r'google-analytics\.com/(?:analytics|ga)\.js', src):
+                return True, None, f"analytics.js loader src {src[:100]!r}"
+            code = script.string or script.get_text() or ''
+            for pattern, how in self.GA_SCRIPT_PATTERNS:
+                m = re.search(pattern, code)
+                if m:
+                    ga_id = m.group(1) if m.groups() else None
+                    if not ga_id:
+                        id_match = re.search(self.GA_ID, code)
+                        ga_id = id_match.group(1) if id_match else None
+                    return True, ga_id, f"{how} in inline script: {obs.snippet(code, m.group(0), 30)!r}"
+        return None
+
     def _detect_pixels(self, html_str: str) -> List[AnalyticsPixel]:
         """Detect analytics and tracking pixels."""
         pixels = []
         html_lower = html_str.lower()
         
-        # Google Analytics
-        ga_patterns = [
-            r'google-analytics\.com/analytics',
-            r'googletagmanager\.com',
-            r'gtag\s*\(',
-            r'ga\s*\(\s*[\'"]create',
-            r'UA-\d+-\d+',
-            r'G-[A-Z0-9]+',
-        ]
-        ga_detected = any(re.search(p, html_str, re.IGNORECASE) for p in ga_patterns)
+        # Google Analytics: only inside <script> content or a script src, and only as a
+        # gtag/analytics.js loader, a gtag('config') / ga('create') call, or a case-sensitive
+        # measurement ID. Class names and page text never count.
         pixel_evidence = {}
-        if ga_detected:
-            ga_hit = next(p for p in ga_patterns if re.search(p, html_str, re.IGNORECASE))
-            ga_text = re.search(ga_hit, html_str, re.IGNORECASE).group(0)
-            pixel_evidence['Google Analytics'] = f"pattern {ga_hit!r} (IGNORECASE) matched {ga_text!r}: " \
-                f"{obs.snippet(html_str, ga_text, 30)!r}"
-        
-        # Try to extract GA ID
-        ga_id = None
-        ga_match = re.search(r'(UA-\d+-\d+|G-[A-Z0-9]+)', html_str)
-        if ga_match:
-            ga_id = ga_match.group(1)
+        ga_detected, ga_id = False, None
+        ga_hit = self._find_google_analytics(html_str)
+        if ga_hit:
+            ga_detected, ga_id, how = ga_hit
+            pixel_evidence['Google Analytics'] = how
         
         pixels.append(AnalyticsPixel(
             name='Google Analytics',

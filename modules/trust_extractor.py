@@ -45,22 +45,29 @@ class TrustExtractor:
         'Rivyo': ['rivyo', 'rivyo.com'],
     }
     
-    # Payment method patterns
+    # Payment method patterns (regexes, matched as whole words against html + visible text).
+    # Card brands are reported by name; 'Discover' only from payment icons, since the word
+    # is common page copy ("Discover our collection").
     PAYMENT_METHODS = {
-        'Shop Pay': ['shop pay', 'shopify pay', 'shop-pay'],
-        'PayPal': ['paypal'],
-        'Apple Pay': ['apple pay', 'applepay'],
-        'Google Pay': ['google pay', 'googlepay', 'gpay'],
-        'Amazon Pay': ['amazon pay', 'amazonpay'],
-        'Klarna': ['klarna'],
-        'Afterpay': ['afterpay'],
-        'Affirm': ['affirm'],
-        'Sezzle': ['sezzle'],
-        'Zip': ['zip pay', 'quadpay'],
-        'Credit Card': ['visa', 'mastercard', 'amex', 'american express', 'discover'],
-        'Venmo': ['venmo'],
-        'Clearpay': ['clearpay'],
+        'Shop Pay': [r'\bshop[ -]?pay\b', r'\bshopify pay\b'],
+        'PayPal': [r'\bpaypal\b'],
+        'Apple Pay': [r'\bapple[ -]?pay\b'],
+        'Google Pay': [r'\bgoogle[ -]?pay\b', r'\bgpay\b'],
+        'Amazon Pay': [r'\bamazon[ -]?pay\b'],
+        'Klarna': [r'\bklarna\b'],
+        'Afterpay': [r'\bafterpay\b'],
+        'Affirm': [r'\baffirm\b'],
+        'Sezzle': [r'\bsezzle\b'],
+        'Zip': [r'\bzip[ -]?pay\b', r'\bquadpay\b'],
+        'Visa': [r'\bvisa\b'],
+        'Mastercard': [r'\bmaster[ -]?card\b', r'\bpi-master\b'],
+        'American Express': [r'\bamerican[ _-]?express\b', r'\bamex\b'],
+        'Discover': [r'\bpi-discover\b'],
+        'Venmo': [r'\bvenmo\b'],
+        'Clearpay': [r'\bclearpay\b'],
     }
+    CARD_BRANDS = ('Visa', 'Mastercard', 'American Express', 'Discover')
+    GENERIC_CARD_PATTERNS = [r'\bcredit cards?\b', r'\bdebit cards?\b', r'\bcard payments?\b']
     
     # Trust badge patterns
     TRUST_BADGES = {
@@ -235,10 +242,11 @@ class TrustExtractor:
         payment_evidence = {}
         for method, patterns in self.PAYMENT_METHODS.items():
             for pattern in patterns:
-                if pattern in combined:
+                match = re.search(pattern, combined)
+                if match:
                     methods.append(method)
-                    payment_evidence[method] = f"PAYMENT_METHODS substring {pattern!r} in html+text " \
-                        f"({obs.snippet(combined, pattern, 25)!r})"
+                    payment_evidence[method] = f"PAYMENT_METHODS {pattern!r} matched {match.group(0)!r} " \
+                        f"({obs.snippet(combined, match.group(0), 25)!r})"
                     break
         
         # Method 1: Parse Shopify Apple Pay capabilities JSON (like Rastaclat)
@@ -286,19 +294,16 @@ class TrustExtractor:
                 if 'Venmo' not in methods:
                     methods.append('Venmo')
         
-        # Method 3: Also check for payment icons
-        payment_icons = soup.select('img[alt*="pay"], img[src*="payment"], .payment-icons img')
+        # Method 3: payment icons (alt text or file name); here a bare 'discover' is a card brand
+        payment_icons = soup.select('img[alt*="pay" i], img[src*="payment"], .payment-icons img, '
+                                    '.list-payment img, [class*="payment"] img')
+        icon_patterns = dict(self.PAYMENT_METHODS, Discover=[r'\bdiscover\b'])
         for icon in payment_icons:
-            alt = icon.get('alt', '').lower()
-            src = icon.get('src', '').lower()
-            
-            for method, patterns in self.PAYMENT_METHODS.items():
-                if method not in methods:
-                    for pattern in patterns:
-                        if pattern in alt or pattern in src:
-                            methods.append(method)
-                            payment_evidence[method] = f"payment icon img alt/src contains {pattern!r}"
-                            break
+            label = f"{icon.get('alt', '')} {icon.get('src', '').rsplit('/', 1)[-1]}".lower()
+            for method, patterns in icon_patterns.items():
+                if method not in methods and any(re.search(pt, label) for pt in patterns):
+                    methods.append(method)
+                    payment_evidence[method] = f"payment icon img alt/src {label[:60]!r}"
 
         # Method 4: Check for Shopify dynamic checkout scripts
         if 'shopify.paymentbutton' in html_lower or 'portable-wallets' in html_lower:
@@ -306,7 +311,16 @@ class TrustExtractor:
                 methods.append('Shop Pay')
                 payment_evidence['Shop Pay'] = "substring 'shopify.paymentbutton' or 'portable-wallets'"
 
-        methods_out = list(set(methods))
+        # Generic 'Credit Card' only when cards are mentioned and no brand is named
+        if not any(m in self.CARD_BRANDS for m in methods):
+            for pattern in self.GENERIC_CARD_PATTERNS:
+                match = re.search(pattern, combined)
+                if match:
+                    methods.append('Credit Card')
+                    payment_evidence['Credit Card'] = f"no card brand named; {pattern!r} matched {match.group(0)!r}"
+                    break
+
+        methods_out = sorted(set(methods))
         obs.note('payment_methods', methods_out, 'regex' if methods_out else 'default',
                  '; '.join(f"{k}: {v}" for k, v in payment_evidence.items()) or "no payment pattern matched")
         return methods_out

@@ -355,7 +355,7 @@ class TestInsightGeneration:
             url="https://example.com",
             scan_timestamp=datetime.now(),
             platform=Platform.SHOPIFY,
-            brand_description_zh="测试品牌",
+            brand_positioning="Simple cotton basics",
             categories=['Clothing', 'Accessories'],
             price_min=20.0,
             price_max=100.0,

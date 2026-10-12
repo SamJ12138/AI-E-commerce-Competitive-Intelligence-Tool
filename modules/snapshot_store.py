@@ -17,6 +17,35 @@ from .models import SiteIntelligence, ChangeReport
 
 logger = logging.getLogger(__name__)
 
+CHANGE_TEXT = {
+    'en': {
+        'price_min': "Lowest price changed from ${old} to ${new}",
+        'price_max': "Highest price changed from ${old} to ${new}",
+        'new_banner': "New announcement bar: {text}",
+        'banner_removed': "Announcement bar removed",
+        'new_product': "New product: {name}",
+        'removed_product': "Product removed: {name}",
+        'new_category': "New category: {name}",
+        'removed_category': "Category removed: {name}",
+        'threshold': "Free-shipping threshold changed from ${old} to ${new}",
+        'return_days': "Return window changed from {old} to {new} days",
+        'unknown': "unknown",
+    },
+    'zh': {
+        'price_min': "最低价从 ${old} 变为 ${new}",
+        'price_max': "最高价从 ${old} 变为 ${new}",
+        'new_banner': "新公告栏: {text}",
+        'banner_removed': "公告栏已移除",
+        'new_product': "新产品: {name}",
+        'removed_product': "下架产品: {name}",
+        'new_category': "新品类: {name}",
+        'removed_category': "移除品类: {name}",
+        'threshold': "免运费门槛从 ${old} 变为 ${new}",
+        'return_days': "退货期限从 {old}天 变为 {new}天",
+        'unknown': "未知",
+    },
+}
+
 
 class SnapshotStore:
     """
@@ -190,7 +219,8 @@ class SnapshotStore:
     def compute_changes(
         self,
         current: SiteIntelligence,
-        previous: Optional[Dict[str, Any]] = None
+        previous: Optional[Dict[str, Any]] = None,
+        language: str = 'zh'
     ) -> Optional[ChangeReport]:
         """
         Compute changes between current scan and previous snapshot.
@@ -210,7 +240,11 @@ class SnapshotStore:
             return None
         
         current_data = current.to_dict()
-        
+        t = CHANGE_TEXT.get(language, CHANGE_TEXT['zh'])
+
+        def val(v):
+            return t['unknown'] if v is None else v
+
         report = ChangeReport(
             domain=current.domain,
             previous_scan=datetime.fromisoformat(previous['scan_timestamp']),
@@ -218,15 +252,9 @@ class SnapshotStore:
         )
         
         # Compare prices
-        if previous.get('price_min') != current_data.get('price_min'):
-            old_min = previous.get('price_min', 'N/A')
-            new_min = current_data.get('price_min', 'N/A')
-            report.price_changes.append(f"最低价从 ${old_min} 变为 ${new_min}")
-        
-        if previous.get('price_max') != current_data.get('price_max'):
-            old_max = previous.get('price_max', 'N/A')
-            new_max = current_data.get('price_max', 'N/A')
-            report.price_changes.append(f"最高价从 ${old_max} 变为 ${new_max}")
+        for key in ('price_min', 'price_max'):
+            if previous.get(key) != current_data.get(key):
+                report.price_changes.append(t[key].format(old=val(previous.get(key)), new=val(current_data.get(key))))
         
         # Compare promotions
         old_announcement = previous.get('announcement_bar_text', '')
@@ -234,9 +262,9 @@ class SnapshotStore:
         
         if old_announcement != new_announcement:
             if new_announcement:
-                report.promo_changes.append(f"新公告栏: {new_announcement[:100]}")
+                report.promo_changes.append(t['new_banner'].format(text=new_announcement[:100]))
             elif old_announcement:
-                report.promo_changes.append("公告栏已移除")
+                report.promo_changes.append(t['banner_removed'])
         
         # Compare products
         old_products = set(p.get('title', '') for p in previous.get('hero_products', []))
@@ -246,10 +274,10 @@ class SnapshotStore:
         removed_products = old_products - new_products
         
         for product in list(added_products)[:3]:
-            report.new_products.append(f"新产品: {product}")
+            report.new_products.append(t['new_product'].format(name=product))
         
         for product in list(removed_products)[:3]:
-            report.removed_products.append(f"下架产品: {product}")
+            report.removed_products.append(t['removed_product'].format(name=product))
         
         # Compare categories
         old_categories = set(previous.get('categories', []))
@@ -259,27 +287,26 @@ class SnapshotStore:
         removed_cats = old_categories - new_categories
         
         for cat in list(added_cats)[:3]:
-            report.category_changes.append(f"新品类: {cat}")
+            report.category_changes.append(t['new_category'].format(name=cat))
         
         for cat in list(removed_cats)[:3]:
-            report.category_changes.append(f"移除品类: {cat}")
+            report.category_changes.append(t['removed_category'].format(name=cat))
         
         # Compare policies
         old_shipping = previous.get('shipping_policy') or {}
         new_shipping = current_data.get('shipping_policy') or {}
         
         if old_shipping.get('free_shipping_threshold') != new_shipping.get('free_shipping_threshold'):
-            old_thresh = old_shipping.get('free_shipping_threshold', 'N/A')
-            new_thresh = new_shipping.get('free_shipping_threshold', 'N/A')
-            report.policy_changes.append(f"免运费门槛从 ${old_thresh} 变为 ${new_thresh}")
+            report.policy_changes.append(t['threshold'].format(
+                old=val(old_shipping.get('free_shipping_threshold')),
+                new=val(new_shipping.get('free_shipping_threshold'))))
         
         old_returns = previous.get('return_policy') or {}
         new_returns = current_data.get('return_policy') or {}
         
         if old_returns.get('return_days') != new_returns.get('return_days'):
-            old_days = old_returns.get('return_days', 'N/A')
-            new_days = new_returns.get('return_days', 'N/A')
-            report.policy_changes.append(f"退货期限从 {old_days}天 变为 {new_days}天")
+            report.policy_changes.append(t['return_days'].format(
+                old=val(old_returns.get('return_days')), new=val(new_returns.get('return_days'))))
         
         return report if report.has_changes() else None
     

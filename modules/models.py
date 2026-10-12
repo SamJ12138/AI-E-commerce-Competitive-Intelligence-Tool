@@ -187,7 +187,8 @@ class SiteIntelligence:
     
     # Brand positioning
     brand_name: str = ""
-    brand_description_zh: str = ""
+    brand_positioning: Optional[str] = None         # verbatim from the page, never inferred
+    brand_positioning_source: Optional[str] = None  # 'meta description' / 'title' / 'headline'
     meta_description: str = ""
     hero_text: str = ""
     about_snippet: str = ""
@@ -252,7 +253,8 @@ class SiteIntelligence:
             "platform_confidence": self.platform_confidence,
             "platform_signals": self.platform_signals,
             "brand_name": self.brand_name,
-            "brand_description_zh": self.brand_description_zh,
+            "brand_positioning": self.brand_positioning,
+            "brand_positioning_source": self.brand_positioning_source,
             "meta_description": self.meta_description,
             "hero_text": self.hero_text,
             "about_snippet": self.about_snippet,

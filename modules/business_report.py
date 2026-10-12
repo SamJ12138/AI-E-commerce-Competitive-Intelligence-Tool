@@ -235,15 +235,17 @@ class BusinessReportGenerator:
             lines.append("### 价格分布")
             lines.append("")
         
-        price_tiers = {"Budget (<$50)": [], "Mid-range ($50-150)": [], "Premium ($150+)": []}
+        tier_names = (("Budget (<$50)", "Mid-range ($50-150)", "Premium ($150+)") if self.is_en
+                      else ("低价 (<$50)", "中端 ($50-150)", "高端 ($150+)"))
+        price_tiers = {name: [] for name in tier_names}
         for intel in intel_list:
             if intel.price_median:
                 if intel.price_median < 50:
-                    price_tiers["Budget (<$50)"].append(intel.domain)
+                    price_tiers[tier_names[0]].append(intel.domain)
                 elif intel.price_median < 150:
-                    price_tiers["Mid-range ($50-150)"].append(intel.domain)
+                    price_tiers[tier_names[1]].append(intel.domain)
                 else:
-                    price_tiers["Premium ($150+)"].append(intel.domain)
+                    price_tiers[tier_names[2]].append(intel.domain)
         
         for tier, domains in price_tiers.items():
             if domains:
@@ -286,7 +288,10 @@ class BusinessReportGenerator:
         lines.append("")
         
         # Basic info - compact format
-        lines.append(f"**Website:** [{intel.url}]({intel.url}) | **Platform:** {intel.platform.value}")
+        if self.is_en:
+            lines.append(f"**Website:** [{intel.url}]({intel.url}) | **Platform:** {intel.platform.value}")
+        else:
+            lines.append(f"**网站:** [{intel.url}]({intel.url}) | **平台:** {intel.platform.value}")
         lines.append("")
         
         # Scan history
@@ -326,15 +331,15 @@ class BusinessReportGenerator:
                     ship_str = f"Free over ${ship.free_shipping_threshold:.0f}" if self.is_en else f"满${ship.free_shipping_threshold:.0f}免运费"
             else:
                 ship_str = "Paid shipping" if self.is_en else "有运费"
-            lines.append(f"- **Shipping:** {ship_str}")
+            lines.append(f"- **{'Shipping' if self.is_en else '运费'}:** {ship_str}")
         
         # Returns
         if intel.return_policy and intel.return_policy.return_days:
             ret = intel.return_policy
-            ret_str = f"{ret.return_days} days"
+            ret_str = f"{ret.return_days} days" if self.is_en else f"{ret.return_days}天"
             if ret.free_returns:
                 ret_str += " (free)" if self.is_en else " (免费)"
-            lines.append(f"- **Returns:** {ret_str}")
+            lines.append(f"- **{'Returns' if self.is_en else '退货'}:** {ret_str}")
         
         # Marketing tactics
         tactics = []
@@ -347,7 +352,7 @@ class BusinessReportGenerator:
         if intel.has_subscriptions:
             tactics.append("Subscriptions" if self.is_en else "订阅模式")
         if tactics:
-            lines.append(f"- **Marketing:** {', '.join(tactics)}")
+            lines.append(f"- **{'Marketing' if self.is_en else '营销'}:** {', ' .join(tactics) if self.is_en else '、'.join(tactics)}")
         
         lines.append("")
         
@@ -408,22 +413,23 @@ class BusinessReportGenerator:
             lines.append("| 竞品 | 价格区间 | 免运费 | 退货 | 会员 | 订阅 |")
             lines.append("|------|---------|--------|------|------|------|")
         
+        na = "N/A" if self.is_en else "未知"
         for intel in intel_list:
             # Price
-            price = f"${intel.price_min:.0f}-${intel.price_max:.0f}" if intel.price_min else "N/A"
-            
+            price = f"${intel.price_min:.0f}-${intel.price_max:.0f}" if intel.price_min else na
+
             # Free shipping
             free_ship = "❌"
             if intel.shipping_policy:
                 if intel.shipping_policy.free_shipping_threshold == 0:
-                    free_ship = "✅ All"
+                    free_ship = "✅ All" if self.is_en else "✅ 全场"
                 elif intel.shipping_policy.free_shipping_threshold:
                     free_ship = f"${intel.shipping_policy.free_shipping_threshold:.0f}+"
-            
+
             # Returns
-            returns = "N/A"
+            returns = na
             if intel.return_policy and intel.return_policy.return_days:
-                returns = f"{intel.return_policy.return_days}d"
+                returns = f"{intel.return_policy.return_days}d" if self.is_en else f"{intel.return_policy.return_days}天"
                 if intel.return_policy.free_returns:
                     returns += " ✅"
             

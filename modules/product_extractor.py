@@ -9,11 +9,13 @@ Handles multiple platforms and HTML structures to extract:
 - Bundle/subscription indicators
 """
 
+import copy
 import re
 import json
 import logging
 import statistics
 from typing import List, Optional, Dict, Any, Tuple
+from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
 from .models import Product, PriceInfo, Platform
@@ -76,7 +78,13 @@ class ProductExtractor:
             List of Product objects
         """
         products: List[Product] = []
-        
+
+        # A product page describes one product: its own title, URL and price block
+        if page_type == 'product':
+            product = self._extract_product_page(soup, url)
+            if product:
+                return [product]
+
         # Try platform-specific extraction first
         if self.platform == Platform.SHOPIFY:
             products = self._extract_shopify(soup, url)
@@ -93,12 +101,13 @@ class ProductExtractor:
                              fallback="_extract_generic", stage="products", url=url)
             products = self._extract_generic(soup, url)
         
-        # Deduplicate by URL
+        # Deduplicate by URL path (trailing slash and query string ignored)
         seen_urls = set()
         unique_products = []
         for p in products:
-            if p.url not in seen_urls:
-                seen_urls.add(p.url)
+            key = product_key(p.url)
+            if key not in seen_urls:
+                seen_urls.add(key)
                 unique_products.append(p)
         
         return unique_products
@@ -217,6 +226,39 @@ class ProductExtractor:
         
         return products
     
+    PRODUCT_TITLE_SELECTORS = ['h1.product_title', 'h1.product__title', '.product__title h1',
+                               '.product-single__title', 'h1[itemprop="name"]', 'main h1', 'h1']
+    PRICE_HINT = ('.price, [class*="price"], [class*="Price"], ins, del, s, sale-price, '
+                  'regular-price, [data-price], .money, .amount')
+
+    def _extract_product_page(self, soup: BeautifulSoup, url: str) -> Optional[Product]:
+        """The page's own product: h1 title, the page URL, and the price block nearest the h1."""
+        title_elem = None
+        for selector in self.PRODUCT_TITLE_SELECTORS:
+            title_elem = soup.select_one(selector)
+            if title_elem and title_elem.get_text(strip=True):
+                break
+        if not title_elem:
+            return None
+        title = title_elem.get_text(strip=True)
+
+        price_info = None
+        container = title_elem.parent
+        while container is not None and container.name not in ('body', '[document]'):
+            hint = container.select_one(self.PRICE_HINT)
+            if hint and re.search(r'\d', hint.get_text()):
+                price_info = self._extract_price_from_element(container)
+                if price_info:
+                    break
+            container = container.parent
+
+        product = Product(title=title[:200], url=url, price=price_info)
+        product._obs = {'source': 'selector',
+                        'detail': f"product page: title via {selector!r}; price block <{getattr(container, 'name', None)} "
+                                  f"class={container.get('class') if container is not None else None}>; "
+                                  f"price {getattr(price_info, '_obs', 'none found')}"}
+        return product
+
     def _parse_structured_data_product(
         self,
         data: Dict[str, Any],
@@ -302,15 +344,14 @@ class ProductExtractor:
                 raw_price, raw_compare = price, compare_at
                 
                 if price:
-                    # Shopify prices are in cents
-                    if isinstance(price, (int, float)) and price > 100:
-                        price = price / 100
-                    
+                    price = self._shopify_amount(price)
+                    compare_at = self._shopify_amount(compare_at) if compare_at else None
+
                     price_info = PriceInfo(
                         currency='USD',  # Default, will be overridden if detected
-                        current_price=float(price) if price else None,
-                        compare_at_price=float(compare_at) / 100 if compare_at and isinstance(compare_at, (int, float)) else None,
-                        is_on_sale=bool(compare_at and compare_at > price),
+                        current_price=price,
+                        compare_at_price=compare_at,
+                        is_on_sale=bool(compare_at and price and compare_at > price),
                     )
                     
                     if price_info.is_on_sale and price_info.compare_at_price:
@@ -352,8 +393,8 @@ class ProductExtractor:
             )
             product._obs = {'source': 'json',
                             'detail': (f"Shopify product JSON variants[0] price={raw_price!r} "
-                                       f"compare_at_price={raw_compare!r} (int >100 treated as cents; "
-                                       f"compare-at only read when int/float)") if variants else
+                                       f"compare_at_price={raw_compare!r} (strings are dollars, "
+                                       f"integers are cents)") if variants else
                                       "Shopify product JSON without variants"}
             return product
 
@@ -363,6 +404,17 @@ class ProductExtractor:
             logger.debug(f"Error parsing Shopify product: {e}")
             return None
     
+    @staticmethod
+    def _shopify_amount(value) -> Optional[float]:
+        """/products.json serves dollar strings ("39.00"); theme product JSON serves integer cents."""
+        if isinstance(value, str):
+            return float(value.replace(',', '')) if value.strip() else None
+        if isinstance(value, int):
+            return value / 100
+        if isinstance(value, float):
+            return value
+        return None
+
     def _extract_woocommerce(self, soup: BeautifulSoup, url: str) -> List[Product]:
         """Extract products from WooCommerce pages."""
         products: List[Product] = []
@@ -531,75 +583,66 @@ class ProductExtractor:
             logger.debug(f"Error parsing product card: {e}")
             return None
     
+    # Struck-through / original price markers; matched elements are removed before the
+    # current price is read.
+    COMPARE_SELECTORS = [
+        's', 'del', 'strike',
+        'compare-at-price', '.compare-at-price', '.was-price', '.original-price',
+        '.price-compare', '.price__compare', '.line-through',
+    ]
+    # Current price, most specific first (sale price before the generic price block).
+    PRICE_SELECTORS = [
+        'ins', '.price-item--sale', 'sale-price', '.price__sale', '.sale-price', '.price--sale',
+        '.current-price', '.price__current',
+        'regular-price', '.price', '.product-price', '.price-item', '[data-price]',
+        '.money', '.amount', '.regular-price', '[class*="price"]', '[class*="Price"]',
+        '.product__price', '.card-price', '.h6.text-subdued',
+    ]
+
     def _extract_price_from_element(
         self,
         element: BeautifulSoup
     ) -> Optional[PriceInfo]:
-        """Extract price information from an element."""
-        try:
-            # Extended price selectors - including modern Shopify theme patterns
-            # Patterns found in sites like Rastaclat:
-            # <sale-price class="h6 text-subdued"><span class="sr-only">Sale price</span>$30.00</sale-price>
-            # <price-list class="price-list "><sale-price>...</sale-price></price-list>
-            price_selectors = [
-                # Modern Shopify custom elements (like Rastaclat)
-                'sale-price',
-                'regular-price', 
-                'price-list sale-price',
-                'price-list regular-price',
-                # Standard selectors
-                '.price', '.product-price', '.price-item',
-                '[data-price]', '.money', '.amount',
-                '.current-price', '.sale-price', '.regular-price',
-                # Additional Shopify patterns
-                '.price__current', '.price__sale', '.price-item--sale',
-                '[class*="price"]', '[class*="Price"]',
-                '.product__price', '.card-price',
-                '.h6.text-subdued',  # Rastaclat pattern
-            ]
-            
-            price_text = None
-            compare_text = None
-            price_via = None
-            compare_via = None
+        """
+        Extract price information from a product card or product page.
 
-            # Look for current price
-            for selector in price_selectors:
-                price_elem = element.select_one(selector)
+        The struck-through amount (<s>, <del>, compare-at elements) is the original price;
+        the current price is read from what is left once struck and screen-reader-only text
+        is removed (Dawn: '.price__sale' / '.price-item--sale'; WooCommerce: <ins>).
+        """
+        try:
+            card = copy.copy(element)
+            for hidden in card.select('.sr-only, .screen-reader-text, .visually-hidden'):
+                hidden.decompose()
+
+            compare_text = None
+            compare_via = None
+            for selector in self.COMPARE_SELECTORS:
+                for elem in card.select(selector):
+                    text = elem.get_text(strip=True)
+                    if compare_text is None and re.search(r'\d', text):
+                        compare_text, compare_via = text, selector
+                    elem.decompose()
+                if compare_text is not None:
+                    break
+
+            price_text = None
+            price_via = None
+            for selector in self.PRICE_SELECTORS:
+                price_elem = card.select_one(selector)
                 if price_elem:
-                    # Get text, excluding screen-reader only text
-                    sr_only = price_elem.select_one('.sr-only')
-                    if sr_only:
-                        sr_only.decompose()
-                    price_text = price_elem.get_text(strip=True)
-                    price_via = selector
-                    if price_text and '$' in price_text:
+                    text = price_elem.get_text(strip=True)
+                    if text and re.search(r'\d', text) and any(s in text for s in self.CURRENCY_MAP):
+                        price_text, price_via = text, selector
                         break
 
             # If still no price, try looking for any element with $ symbol
             if not price_text:
-                all_text = element.get_text()
-                price_match = re.search(r'\$[\d,.]+', all_text)
+                price_match = re.search(r'\$[\d,.]+', card.get_text())
                 if price_match:
                     price_text = price_match.group()
                     price_via = "first \\$[\\d,.]+ in card text"
-            
-            # Look for compare-at price
-            compare_selectors = [
-                # Modern Shopify patterns
-                'compare-at-price',
-                '.compare-at-price', '.was-price', '.original-price',
-                '.price-compare', '.price__compare', '.price-item--regular',
-                's', 'del', '.line-through',
-                '[class*="compare"]', '[class*="original"]',
-            ]
-            for selector in compare_selectors:
-                compare_elem = element.select_one(selector)
-                if compare_elem:
-                    compare_text = compare_elem.get_text(strip=True)
-                    compare_via = selector
-                    break
-            
+
             if not price_text:
                 return None
             
@@ -684,6 +727,12 @@ class ProductExtractor:
                 pass
         
         return None, currency
+
+
+def product_key(url: str) -> str:
+    """Identity of a product page: host + path without trailing slash, query or fragment."""
+    parts = urlsplit(url or '')
+    return f"{parts.netloc.lower()}{parts.path.rstrip('/')}"
 
 
 def extract_products(

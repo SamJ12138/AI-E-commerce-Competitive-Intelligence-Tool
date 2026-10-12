@@ -22,7 +22,7 @@ import logging
 import hashlib
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, NamedTuple, Optional, Tuple
 
 import click
 import yaml
@@ -104,187 +104,83 @@ def load_sites(sites_file: str) -> List[str]:
     return unique
 
 
-def extract_brand_info(soup, html_str: str) -> Tuple[str, str, str, str]:
+class BrandInfo(NamedTuple):
+    brand_name: str
+    positioning: Optional[str]          # verbatim text from the page, or None
+    positioning_source: Optional[str]   # 'meta description' / 'title' / 'headline'
+    meta_description: str
+    hero_text: str
+
+
+TITLE_SEPARATORS = (' | ', ' \u2013 ', ' \u2014 ', ' - ', ' : ', ': ', ' \u2022 ')
+
+
+def extract_brand_info(soup, html_str: str) -> BrandInfo:
     """
-    Extract brand positioning information.
-    
-    Returns:
-        Tuple of (brand_name, description_zh, meta_description, hero_text)
+    Brand name and positioning, both taken from the page itself.
+
+    Positioning is the first of: meta description (name=description, og:, twitter:),
+    the tagline part of <title>, the hero headline (3+ words). It is quoted verbatim in
+    the page's own language; when none exists it is None. Nothing is inferred.
     """
     brand_name = ""
-    description_zh = ""
     meta_description = ""
     hero_text = ""
-    
-    # Get meta description - try multiple approaches
-    meta_selectors = [
-        ('meta', {'name': 'description'}),
-        ('meta', {'property': 'og:description'}),
-        ('meta', {'name': 'twitter:description'}),
-    ]
-    
-    for tag, attrs in meta_selectors:
-        meta_tag = soup.find(tag, attrs=attrs)
-        if meta_tag and meta_tag.get('content'):
-            meta_description = meta_tag.get('content', '')[:300]
+
+    for attrs in ({'name': 'description'}, {'property': 'og:description'}, {'name': 'twitter:description'}):
+        meta_tag = soup.find('meta', attrs=attrs)
+        if meta_tag and meta_tag.get('content', '').strip():
+            meta_description = ' '.join(meta_tag['content'].split())[:300]
             break
-    
-    # Get OG title or site title as brand name
+
     og_title = soup.find('meta', property='og:site_name')
     if og_title and og_title.get('content'):
         brand_name = og_title.get('content', '')[:50]
         obs.note('brand_name', brand_name, 'selector', "meta[property=og:site_name]")
 
-    if not brand_name:
-        title_tag = soup.find('title')
-        if title_tag:
-            title = title_tag.get_text(strip=True)
-            # Take first part before | or - separator
-            for sep in ['|', '-', '–', '—', ':', '•']:
-                if sep in title:
-                    brand_name = title.split(sep)[0].strip()
-                    obs.note('brand_name', brand_name, 'selector', f"<title> split on {sep!r}")
-                    break
-            if not brand_name:
-                brand_name = title[:50]
-                obs.note('brand_name', brand_name, 'selector', "<title>[:50]")
-    
-    # Get hero text from common hero section selectors - expanded
+    title = ""
+    title_tag = soup.find('title')
+    if title_tag:
+        title = ' '.join(title_tag.get_text(strip=True).split())
+    title_parts = [title]
+    for sep in TITLE_SEPARATORS:
+        if sep in title:
+            title_parts = [part.strip() for part in title.split(sep) if part.strip()]
+            break
+    if not brand_name and title:
+        brand_name = title_parts[0][:50]
+        obs.note('brand_name', brand_name, 'selector', "<title> first part")
+
     hero_selectors = [
-        # Standard hero elements
         '.hero__title', '.hero-title', '.hero h1', '.banner__heading',
         'h1.title', '.headline', 'section h1', '.hero-banner h1',
         '[data-section-type="slideshow"] h1', '.slideshow h1',
-        # Modern Shopify themes
-        '.banner__heading', '.slideshow__heading', '.hero__heading',
+        '.slideshow__heading', '.hero__heading',
         '.image-with-text__heading', '.rich-text__heading',
-        '.section-header__title', '.featured-collection__title',
-        # Generic prominent text
-        '.jumbotron h1', '.masthead h1', '.intro h1',
-        'main h1', 'article h1', '.content h1',
-        '[class*="Hero"] h1', '[class*="hero"] h1',
-        '[class*="Banner"] h1', '[class*="banner"] h1',
+        'main h1', '[class*="hero"] h1', '[class*="banner"] h1',
     ]
-    
     for selector in hero_selectors:
         try:
             elem = soup.select_one(selector)
-            if elem:
-                text = elem.get_text(strip=True)
-                if text and len(text) > 3 and len(text) < 300:
-                    hero_text = text
-                    break
         except Exception:
             obs.swallowed("main.py:extract_brand_info", error_type="parse", fallback="next hero selector",
                           stage="brand", selector=selector)
             continue
-    
-    # If no hero text, try first significant h1
-    if not hero_text:
-        for h1 in soup.find_all('h1'):
-            text = h1.get_text(strip=True)
-            if text and len(text) > 5 and len(text) < 200:
-                # Skip if it looks like a product title on a product page
-                parent_classes = ' '.join(h1.parent.get('class', []) if h1.parent else [])
-                if 'product' not in parent_classes.lower():
-                    hero_text = text
-                    break
-    
-    # Also try to extract tagline/slogan
-    tagline_selectors = [
-        '.tagline', '.slogan', '.subtitle', '.hero__subtitle',
-        '.banner__subheading', '.hero-description', '.hero__description',
-        '[class*="tagline"]', '[class*="slogan"]'
-    ]
-    
-    tagline = ""
-    for selector in tagline_selectors:
-        try:
-            elem = soup.select_one(selector)
-            if elem:
-                text = elem.get_text(strip=True)
-                if text and len(text) > 5:
-                    tagline = text[:150]
-                    break
-        except Exception:
-            obs.swallowed("main.py:extract_brand_info", error_type="parse", fallback="next tagline selector",
-                          stage="brand", selector=selector)
-            continue
-    
-    # Combine hero and tagline for better context
-    combined_context = f"{hero_text} {tagline} {meta_description}"
-    
-    # Generate Chinese brand description based on content
-    description_zh = generate_brand_description_zh(
-        brand_name, meta_description, combined_context, html_str
-    )
-    
-    return brand_name, description_zh, meta_description, hero_text
+        if elem:
+            text = ' '.join(elem.get_text(' ', strip=True).split())
+            if 3 < len(text) < 300:
+                hero_text = text
+                break
 
+    tagline = next((part for part in title_parts[1:] if part.lower() != brand_name.lower()), None)
+    candidates = [(meta_description, 'meta description'), (tagline, 'title'),
+                  (hero_text if len(hero_text.split()) >= 3 else None, 'headline')]
+    positioning, source = next(((text, src) for text, src in candidates if text), (None, None))
+    obs.note('brand_positioning', positioning, 'selector' if positioning else 'default',
+             f"quoted from the page's {source}" if positioning else
+             "no meta description, title tagline or headline: left empty", stage='brand')
 
-def generate_brand_description_zh(
-    brand_name: str,
-    meta_description: str,
-    hero_text: str,
-    html_str: str
-) -> str:
-    """Generate Chinese brand positioning description."""
-    
-    combined_text = f"{meta_description} {hero_text} {html_str[:5000]}".lower()
-    
-    # Keywords to detect brand type
-    category_keywords = {
-        '时尚服饰': ['fashion', 'clothing', 'apparel', 'wear', 'dress', 'style', 'outfit'],
-        '配饰珠宝': ['accessory', 'accessories', 'bracelet', 'jewelry', 'watch', 'necklace', 'ring'],
-        '美妆护肤': ['beauty', 'skincare', 'cosmetics', 'makeup', 'skin', 'serum', 'cream'],
-        '运动户外': ['sport', 'fitness', 'athletic', 'outdoor', 'gym', 'workout', 'active'],
-        '家居生活': ['home', 'decor', 'furniture', 'living', 'kitchen', 'bedroom'],
-        '电子科技': ['tech', 'electronic', 'gadget', 'device', 'smart', 'digital'],
-        '食品饮料': ['food', 'drink', 'snack', 'organic', 'coffee', 'tea', 'healthy'],
-        '母婴用品': ['baby', 'kids', 'children', 'maternity', 'toddler', 'infant'],
-        '宠物用品': ['pet', 'dog', 'cat', 'animal', 'puppy', 'kitten'],
-    }
-    
-    # Audience keywords
-    audience_keywords = {
-        '年轻消费者': ['young', 'millennial', 'gen z', 'trendy', 'hip', 'cool'],
-        '女性': ['women', 'woman', 'her', 'female', 'ladies', 'feminine'],
-        '男性': ['men', 'man', 'him', 'male', 'masculine', 'gentleman'],
-        '高端客群': ['luxury', 'premium', 'exclusive', 'elite', 'sophisticated'],
-        '注重环保': ['sustainable', 'eco', 'green', 'organic', 'natural', 'vegan'],
-        '礼品场景': ['gift', 'present', 'gifting', 'birthday', 'holiday'],
-    }
-    
-    # Detect category
-    category = "综合品类"
-    for cat, keywords in category_keywords.items():
-        if any(kw in combined_text for kw in keywords):
-            category = cat
-            break
-    
-    # Detect audience
-    audiences = []
-    for aud, keywords in audience_keywords.items():
-        if any(kw in combined_text for kw in keywords):
-            audiences.append(aud)
-    
-    audience_str = "、".join(audiences[:2]) if audiences else "大众消费者"
-
-    # Build description
-    description = f"{category}品牌，面向{audience_str}"
-
-    cat_hit = next(((cat, kw) for cat, kws in category_keywords.items() for kw in kws if kw in combined_text), None)
-    aud_hits = [(aud, next(kw for kw in kws if kw in combined_text))
-                for aud, kws in audience_keywords.items() if any(kw in combined_text for kw in kws)]
-    obs.note('brand_positioning', description, 'regex' if (cat_hit or aud_hits) else 'default',
-             (f"category {cat_hit[1]!r} -> {cat_hit[0]} ({obs.snippet(combined_text, cat_hit[1], 25)!r})"
-              if cat_hit else "no category keyword -> 综合品类")
-             + "; audience " + (", ".join(f"{kw!r} -> {aud}" for aud, kw in aud_hits[:2]) if aud_hits
-                                 else "none -> 大众消费者")
-             + "; substring match over meta+hero+tagline+html[:5000]; always Chinese regardless of --lang",
-             stage='brand')
-
-    return description
+    return BrandInfo(brand_name, positioning, source, meta_description, hero_text)
 
 
 def extract_categories(soup, base_url: str = "") -> List[str]:
@@ -501,12 +397,14 @@ def analyze_site(
     # Step 3: Extract brand info
     update_progress("Extracting brand info...")
     t = obs.begin("brand")
-    brand_name, desc_zh, meta_desc, hero = extract_brand_info(soup, html_str)
-    intel.brand_name = brand_name
-    intel.brand_description_zh = desc_zh
-    intel.meta_description = meta_desc
-    intel.hero_text = hero
-    obs.end("brand", t, brand_name=brand_name, hero_text=hero[:120])
+    brand = extract_brand_info(soup, html_str)
+    intel.brand_name = brand.brand_name
+    intel.brand_positioning = brand.positioning
+    intel.brand_positioning_source = brand.positioning_source
+    intel.meta_description = brand.meta_description
+    intel.hero_text = brand.hero_text
+    obs.end("brand", t, brand_name=brand.brand_name, positioning_source=brand.positioning_source,
+            hero_text=brand.hero_text[:120])
 
     # Step 4: Extract categories from navigation
     update_progress("Extracting categories...")
@@ -763,12 +661,14 @@ def analyze_site(
     # Step 8: Process products and calculate stats
     update_progress("Processing products...")
     
-    # Deduplicate products by URL
+    # Deduplicate products by URL path (a card links '/product/x/', the page itself is '/product/x')
+    from modules.product_extractor import product_key
     seen_urls = set()
     unique_products = []
     for p in all_products:
-        if p.url not in seen_urls:
-            seen_urls.add(p.url)
+        key = product_key(p.url)
+        if key not in seen_urls:
+            seen_urls.add(key)
             unique_products.append(p)
     
     intel.all_products = unique_products[:config.max_products]
@@ -792,15 +692,6 @@ def analyze_site(
         obs.degraded("main.py:analyze_site", "parse", "no products extracted from any page",
                      fallback="homepage JS price fallback", stage="products", event_name="fail")
         
-        if intel.has_discounts:
-            discount_products = [
-                p for p in unique_products 
-                if p.price and p.price.discount_percent
-            ]
-            if discount_products:
-                avg_discount = sum(p.price.discount_percent for p in discount_products) / len(discount_products)
-                intel.discount_summary = f"平均折扣约{avg_discount:.0f}%"
-    
     # FALLBACK: If no prices found from product extraction, try JavaScript extraction
     # This is critical for sites like Alo Yoga where prices are in searchSettings.suggestedProducts
     if not intel.price_min and html_str:
@@ -927,7 +818,7 @@ def _log_final_fields(intel) -> None:
     values = {
         'platform': intel.platform.value,
         'brand_name': intel.brand_name,
-        'brand_positioning': intel.brand_description_zh or intel.meta_description[:100],
+        'brand_positioning': intel.brand_positioning,
         'categories': intel.categories,
         'price_min': intel.price_min,
         'price_max': intel.price_max,
@@ -1125,7 +1016,7 @@ def main(
                     # Handle monitor mode
                     if app_config.monitor_mode:
                         t = obs.begin("change_diff")
-                        change_report = snapshot_store.compute_changes(intel)
+                        change_report = snapshot_store.compute_changes(intel, language=lang)
                         change_reports[domain] = change_report
                         obs.end("change_diff", t, has_changes=bool(change_report and change_report.has_changes()),
                                 compared_with="second-newest stored snapshot (OFFSET 1), before this scan is saved")

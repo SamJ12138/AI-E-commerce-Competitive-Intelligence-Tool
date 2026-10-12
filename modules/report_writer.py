@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 from .models import SiteIntelligence, ChangeReport
-from .insight_generator import generate_insights, format_changes_zh
+from .insight_generator import generate_insights, format_changes
 from .pressure_score import FACTOR_NAMES, RULES, format_input, score_pressure
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class ReportWriter:
             'returns': '退换货',
             'trust_signals': '信任要素',
             'key_takeaway': '关键可复制点',
-            'generated_by': '报告由 E-commerce Intelligence Tool 自动生成',
+            'generated_by': '报告由电商竞争情报工具自动生成',
             'no_info': '无明确信息',
             'none': '无',
             'free_shipping_all': '全场免运费',
@@ -284,7 +284,7 @@ class ReportWriter:
         lines.append(f"### 📈 {t['change_tracking']}")
         lines.append("")
         if change_report:
-            change_lines = format_changes_zh(change_report)
+            change_lines = format_changes(change_report, self.language)
             for change in change_lines:
                 lines.append(f"- {change}")
         else:
@@ -480,7 +480,11 @@ class ReportWriter:
         platform = intel.platform.value.split('/')[0]  # Just first word
         
         # Brand positioning
-        positioning = intel.brand_description_zh[:30] if intel.brand_description_zh else no_info
+        if intel.brand_positioning:
+            text = intel.brand_positioning
+            positioning = f"“{text[:80]}”" + ("…" if len(text) > 80 else "")
+        else:
+            positioning = no_info
         
         # Categories
         sep = ', ' if is_en else '、'
@@ -617,7 +621,7 @@ class ReportWriter:
                     "domain": intel.domain,
                     "url": intel.url,
                     "platform": intel.platform.value,
-                    "brand_positioning": intel.brand_description_zh or intel.meta_description[:100],
+                    "brand_positioning": intel.brand_positioning or "",
                     "categories": "; ".join(intel.categories),
                     "price_min": intel.price_min,
                     "price_max": intel.price_max,

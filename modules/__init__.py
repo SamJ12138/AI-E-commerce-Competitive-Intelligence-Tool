@@ -24,7 +24,7 @@ from .policy_evidence import PolicyEvidenceLadder, PolicyEvidence, EvidenceLevel
 from .trust_extractor import extract_trust_signals
 from .category_extractor import extract_categories, CategoryExtractor
 from .snapshot_store import SnapshotStore
-from .insight_generator import generate_insights, format_changes_zh
+from .insight_generator import generate_insights, format_changes, format_changes_zh
 from .report_writer import write_markdown_report, write_csv, ReportWriter
 from .business_report import BusinessReportGenerator
 
@@ -54,7 +54,7 @@ __all__ = [
     'extract_prices_from_js', 'extract_price_stats_from_html',
     'extract_promotions', 'extract_policies', 'extract_policies_from_homepage_js',
     'extract_trust_signals', 'extract_categories',
-    'generate_insights', 'format_changes_zh',
+    'generate_insights', 'format_changes', 'format_changes_zh',
     'write_markdown_report', 'write_csv',
     'create_blocked_policy_note',
     
