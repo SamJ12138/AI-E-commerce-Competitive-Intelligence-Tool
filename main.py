@@ -595,6 +595,18 @@ def analyze_site(
             products = extract_products(page_soup, page_url, intel.platform, page_type)
             all_products.extend(products)
             product_keys.update(product_key(p.url) for p in products)
+
+        # Product pages declare wallets the homepage may not (<link rel="buy" payment=...>)
+        if page_type == 'product':
+            from modules.trust_extractor import detect_payment_methods, TrustExtractor
+            added = set(detect_payment_methods(page_soup, page_html)) - set(intel.payment_methods or [])
+            if added:
+                merged = set(intel.payment_methods or []) | added
+                if merged & set(TrustExtractor.CARD_BRANDS):
+                    merged.discard('Credit Card')
+                intel.payment_methods = sorted(merged)
+                obs.apply('payment_methods', intel.payment_methods,
+                          f"added {sorted(added)} declared on product page {page_url}", stage="products")
             for p in products:
                 _log_product(p, page_url)
             

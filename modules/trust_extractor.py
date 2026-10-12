@@ -8,6 +8,7 @@ Detects:
 - Guarantees and warranties
 """
 
+import copy
 import re
 import logging
 from typing import List, Dict, Optional, Tuple
@@ -236,8 +237,15 @@ class TrustExtractor:
         html_lower = html_str.lower()
         text = soup.get_text().lower()
         
-        # Check both HTML and visible text
-        combined = html_lower + ' ' + text
+        # Check both HTML and visible text. The PayPal metadata's Venmo flag is read below as a flag;
+        # its attribute name alone ('data-venmo-supported="false"') does not name Venmo as accepted.
+        # Brand words are matched in tags, attributes and visible text, not inside <script> / <style>
+        # bodies (CSS for card icons, analytics referrer lists); the Apple Pay JSON and the PayPal
+        # metadata are read by their own rules below.
+        markup = copy.copy(soup)
+        for tag in markup(['script', 'style', 'noscript', 'template']):
+            tag.decompose()
+        combined = re.sub(r'data-venmo-supported\s*=\s*["\'][^"\']*["\']', ' ', str(markup).lower() + ' ' + text)
         
         payment_evidence = {}
         for method, patterns in self.PAYMENT_METHODS.items():
@@ -268,6 +276,7 @@ class TrustExtractor:
                         'amex': 'American Express',
                         'discover': 'Discover',
                         'jcb': 'JCB',
+                        'elo': 'Elo',
                     }
                     for network in supported:
                         mapped = network_map.get(network.lower(), network_map.get(network))
@@ -293,6 +302,17 @@ class TrustExtractor:
             if paypal_meta.get('data-venmo-supported') == 'true':
                 if 'Venmo' not in methods:
                     methods.append('Venmo')
+                    payment_evidence['Venmo'] = 'meta#in-context-paypal-metadata data-venmo-supported="true"'
+
+        # Wallets declared in <link rel="buy" payment="dev.shopify.shop_pay com.google.pay ...">
+        wallet_tokens = {'com.google.pay': 'Google Pay', 'dev.shopify.shop_pay': 'Shop Pay',
+                         'com.apple.pay': 'Apple Pay'}
+        for link in soup.select('link[rel~="buy"][payment]'):
+            for token in link.get('payment', '').split():
+                mapped = wallet_tokens.get(token.lower())
+                if mapped and mapped not in methods:
+                    methods.append(mapped)
+                    payment_evidence[mapped] = f'<link rel="buy" payment> token {token!r}'
         
         # Method 3: payment icons (alt text or file name); here a bare 'discover' is a card brand
         payment_icons = soup.select('img[alt*="pay" i], img[src*="payment"], .payment-icons img, '
@@ -388,6 +408,11 @@ class TrustExtractor:
                 ))
         
         return guarantees
+
+
+def detect_payment_methods(soup: BeautifulSoup, html_str: str) -> List[str]:
+    """Payment methods named or declared on one page (used for product pages)."""
+    return TrustExtractor()._detect_payment_methods(soup, html_str)
 
 
 def extract_trust_signals(

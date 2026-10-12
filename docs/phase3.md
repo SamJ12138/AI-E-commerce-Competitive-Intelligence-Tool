@@ -172,3 +172,25 @@ their homepages link the returns page. Two causes, the second found only by the 
 Rerun: rastaclat return_days and free_returns, porterandyork free_returns, deathwishcoffee
 return_days now match; allbirds fetches `/pages/returns-exchanges` (return_days already matched
 from the homepage).
+
+### Fix 3 - payment methods: declarations, not words in scripts and styles (all 4 Shopify stores, porterandyork)
+
+After fix 2, payment_methods was partial on all four Shopify stores (against the corrected ground
+truth): Venmo reported where `data-venmo-supported="false"` (rastaclat, allbirds), Elo and Google
+Pay never reported. Three changes, each with a RED test on a hand-written fragment
+(`tests/test_payment_declarations.py`):
+
+- The Venmo flag is read as a flag; the attribute text `data-venmo-supported` no longer matches the
+  word "venmo". `elo` is mapped from the Apple Pay `supportedNetworks` list.
+- `<link rel="buy" payment="dev.shopify.shop_pay com.google.pay ...">` tokens are read (Google Pay,
+  Shop Pay, Apple Pay), and payment methods declared on fetched product pages are merged into the
+  site's list (they were read from the homepage only, where this link does not appear).
+- The product-page merge exposed the next miss on the rerun: porterandyork got Visa / Mastercard /
+  Amex from WooCommerce's inline CSS (`.wc-credit-card-form-card-cvc.visa`), and deathwishcoffee
+  already had Afterpay from an analytics script's referrer-exclusion regex. Brand words are now
+  matched in tags, attributes and visible text, not inside `<script>` / `<style>` bodies; payment
+  icons (`<svg aria-labelledby="pi-visa">`, `img alt`) still count.
+
+Rerun: payment_methods matches on brooklinen, deathwishcoffee and porterandyork; allbirds and
+rastaclat lack only Google Pay, which is declared on product pages only and those runs skip product
+pages once `max_products` is reached from the collection cards.
