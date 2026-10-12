@@ -36,3 +36,44 @@ cloudscraper off.
 | after | 9 | 10, the same URLs | 4 | 10 from `/shop`, then 40 more from it | $7.95-$10.95, median $9.95 |
 
 barefootbuttons scores 10/0/0/0 (was 9/1/0/0).
+
+## 2. No price range from the homepage text
+
+- Owner decision on Phase 5 Batch 4's open question: the homepage dollar-amount fallback is
+  removed. It ran when no product had a price and took the range from every amount written in the
+  homepage HTML (5 to 10000, the first 20), so free-shipping thresholds and gift-card values became
+  prices (brooklinen's default run in Phase 3: $25-$500).
+- `product_extractor.homepage_price_fallback` and its two pattern tables are deleted. When no
+  product read has a price, `price_min`, `price_max`, `price_median` and `currency` are null
+  (empty CSV cells) and `price_note` is `no_priced_product`. The reports print it: report.md's data
+  evidence "Price range: not reported (no product read had a price; other amounts on the pages,
+  such as free-shipping thresholds or gift cards, are not used as prices)", business_report.md the
+  same under Pricing and Price Range, and the Chinese equivalents. The run log has a
+  `no_priced_product` event and each price field's final value comes from it.
+- Fixture (`tests/test_no_price_fallback.py`): a store whose product pages have no price and whose
+  homepage text has "Free shipping on orders over $75", two prices in a paragraph and "Gift cards
+  from $25 to $500". The parametrised fallback cases and the "uses the homepage text" store in
+  `tests/test_dead_code.py` tested the removed behaviour and are removed.
+- RED: 4 of 4 failed (the fixture gave $25-$500 USD, the gift-card amounts; the function still
+  existed; no note in the reports; no `price_note`). GREEN: 363 passed (6 removed, 4 new). Demo
+  reports unchanged (every fixture store has priced products).
+
+### brooklinen (one run, 2026-10-12, `--render-js`)
+
+Same setup as its Phase 5 run (`real_corpus.py run` plus `--render-js`, cloudscraper off, a hook
+saving each rendered page to the session's scratch directory).
+
+| | pages | wall | price range | from |
+|---|---|---|---|---|
+| Phase 3, default settings | 14 | 20.9 s | $25-$500 | homepage amounts (no product had a price) |
+| Phase 5, `--render-js` | 12 | 69.4 s | $15-$320, median $142.50 | 50 product cards |
+| after, `--render-js` | 13 | 79.2 s | $30-$331, median $136.50 | 50 product cards (5 collections, 1 product page) |
+
+- The range comes from the sampled products only: `price_min` and `price_max` are "min / max over
+  50 priced products" in the run log, and there is no fallback event. has_discounts is now True
+  (the Batch 2 slashout fix: compare-at prices are read).
+- Score unchanged, 9/0/1/0. The products miss is the open ground-truth disagreement from Phase 5
+  (the rendered cards show 15% off; the ground truth, from the static product JSON, has no
+  compare-at). Down Pillow is now in the sample ($118, compare-at $139).
+- A default (non-rendered) run of brooklinen, where no product has a price, would now report null
+  price fields with the note; it was not run (one run per store per item).

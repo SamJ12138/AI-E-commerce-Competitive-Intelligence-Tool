@@ -214,6 +214,7 @@ class SiteIntelligence:
     price_median: Optional[float] = None
     has_discounts: bool = False
     discount_summary: str = ""
+    price_note: Optional[str] = None  # 'no_priced_product': no product read had a price (fields null)
     
     # Promotions
     promotions: List[Promotion] = field(default_factory=list)
@@ -301,6 +302,7 @@ class SiteIntelligence:
             "price_min": self.price_min,
             "price_max": self.price_max,
             "price_median": self.price_median,
+            "price_note": self.price_note,
             "has_discounts": self.has_discounts,
             "discount_summary": self.discount_summary,
             "promotions": [p.to_dict() for p in self.promotions],

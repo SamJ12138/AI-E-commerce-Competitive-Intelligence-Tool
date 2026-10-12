@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from .models import SiteIntelligence, ChangeReport
-from .product_sample import describe as describe_sample
+from .product_sample import describe as describe_sample, price_note
 from .report_writer import BRANCH_NAMES, NOT_SEEN_TEXT, format_attempts, not_seen_lines
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ T = {
         # one site
         'platform_one': "**Platform:** {site} runs on {platform}.",
         'pricing_one': "**Pricing:** {count} priced products from ${lo:.0f} to ${hi:.0f}, median ${median:.2f}.",
+        'pricing_note': "**Pricing:** {note}.",
         'discounts_one': "**Discounts:** marked down: {k} of its {m} priced products.",
         'no_discounts_one': "**Discounts:** no marked-down product found.",
         'ship_free_all': "free shipping on every order",
@@ -74,6 +75,7 @@ T = {
         'history': "**Scan History:** {count} scans (First: {first}, Latest: {latest})",
         'metrics': "**Key Metrics:**",
         'm_price': "- **Price Range:** ${lo:.0f} - ${hi:.0f} (Median: ${median:.2f})",
+        'm_price_note': "- **Price Range:** {note}",
         'm_shipping': "- **Shipping:** {text}",
         'm_returns': "- **Returns:** {days} days{free}",
         'free_short': " (free)",
@@ -155,6 +157,7 @@ T = {
         'no_sites': "没有可分析的站点，因此没有任何发现。",
         'platform_one': "**平台:** {site} 使用 {platform}。",
         'pricing_one': "**定价:** 共{count}个有价格的商品，价格${lo:.0f}至${hi:.0f}，中位数${median:.2f}。",
+        'pricing_note': "**定价:** {note}。",
         'discounts_one': "**折扣:** {m}个有价格的商品中有{k}个打折。",
         'no_discounts_one': "**折扣:** 未发现打折商品。",
         'ship_free_all': "全场免运费",
@@ -182,6 +185,7 @@ T = {
         'history': "**扫描历史:** 共{count}次 (首次: {first}, 最近: {latest})",
         'metrics': "**关键指标:**",
         'm_price': "- **价格区间:** ${lo:.0f} - ${hi:.0f} (中位数: ${median:.2f})",
+        'm_price_note': "- **价格区间:** {note}",
         'm_shipping': "- **运费:** {text}",
         'm_returns': "- **退货:** {days}天{free}",
         'free_short': "（免费）",
@@ -344,6 +348,8 @@ class BusinessReportGenerator:
         if intel.price_min and intel.price_max:
             out.append(t['pricing_one'].format(count=len(priced) or 1, lo=intel.price_min, hi=intel.price_max,
                                                median=intel.price_median or intel.price_min))
+        elif intel.price_note:
+            out.append(t['pricing_note'].format(note=price_note(intel.price_note, self.language)))
         if priced:
             on_sale = [p for p in priced if p.price.is_on_sale]
             out.append(t['discounts_one'].format(k=len(on_sale), m=len(priced)) if on_sale
@@ -420,6 +426,8 @@ class BusinessReportGenerator:
         if intel.price_min and intel.price_max:
             lines.append(t['m_price'].format(lo=intel.price_min, hi=intel.price_max,
                                              median=intel.price_median or intel.price_min))
+        elif intel.price_note:
+            lines.append(t['m_price_note'].format(note=price_note(intel.price_note, self.language)))
         lines.append(t['m_shipping'].format(text=self._shipping_text(intel)))
         if _return_days(intel):
             lines.append(t['m_returns'].format(days=_return_days(intel),

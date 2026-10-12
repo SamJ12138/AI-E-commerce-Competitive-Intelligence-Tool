@@ -116,6 +116,21 @@ TEXT = {
 }
 
 
+PRICE_NOTES = {
+    'no_priced_product': {
+        'en': "not reported (no product read had a price; other amounts on the pages, such as "
+              "free-shipping thresholds or gift cards, are not used as prices)",
+        'zh': "未报告（所读产品均无价格；页面上的其他金额，如包邮门槛或礼品卡，不作为价格）",
+    },
+}
+
+
+def price_note(code, language: str = 'en') -> str:
+    """The report text for SiteIntelligence.price_note ('' when there is no note)."""
+    texts = PRICE_NOTES.get(code or '')
+    return texts.get(language, texts['en']) if texts else ''
+
+
 def describe(summary: Dict[str, int], language: str = 'en') -> str:
     """'32 products from 3 collections (at most 10 per collection), the homepage (2) and 4 product
     pages' (or the Chinese equivalent); after a top-up, '30 products from 1 collection (10 per

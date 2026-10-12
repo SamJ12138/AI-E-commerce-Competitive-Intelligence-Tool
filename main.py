@@ -714,22 +714,17 @@ def analyze_site(
         _note_price_stats(unique_products, intel)
     else:
         obs.degraded("main.py:analyze_site", "parse", "no products extracted from any page",
-                     fallback="homepage JS price fallback", stage="products", event_name="fail")
-        
-    # FALLBACK: If no prices found from product extraction, try JavaScript extraction
-    # This is critical for sites like Alo Yoga where prices are in searchSettings.suggestedProducts
-    if not intel.price_min and html_str:
-        logger.info("No prices from product extraction, trying JavaScript fallback...")
-        obs.event("products", "skip", kind="js_price_fallback", reason="no product price; scanning homepage html")
-        from modules.product_extractor import homepage_price_fallback
-        js_price_min, js_price_max, js_price_median, js_currency = homepage_price_fallback(html_str)
-        if js_price_min is not None:
-            intel.price_min = js_price_min
-            intel.price_max = js_price_max
-            intel.price_median = js_price_median
-            if js_currency:
-                intel.currency = js_currency
-            logger.info(f"Extracted prices from JavaScript: ${js_price_min} - ${js_price_max}")
+                     fallback="price fields null", stage="products", event_name="fail")
+
+    # No priced product: the price fields stay null and the reports say why. Other amounts on the
+    # page (free-shipping thresholds, gift cards) are never used as prices.
+    if intel.price_min is None:
+        intel.price_min = intel.price_max = intel.price_median = intel.currency = None
+        intel.price_note = 'no_priced_product'
+        obs.event("products", "skip", kind="no_priced_product", products=len(unique_products),
+                  reason="no product read had a price; price fields left null")
+        for _f in ('price_min', 'price_max', 'price_median', 'currency'):
+            obs.apply(_f, None, "no product read had a price", stage="products")
     
     obs.end("products", t_products, products=len(unique_products), price_min=intel.price_min,
             price_max=intel.price_max)
