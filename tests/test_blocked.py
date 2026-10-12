@@ -26,7 +26,7 @@ def blocked():
 
 def test_blocked_site_is_unknown(blocked):
     assert blocked.status == "blocked"
-    assert blocked.fetch_attempts == ["requests 403", "cloudscraper 403"]
+    assert blocked.fetch_attempts == ["requests 403", "honest-ua 403", "cloudscraper 403"]
     for name in UNKNOWN_FIELDS:
         assert getattr(blocked, name) is None, name
     assert blocked.payment_methods == [] and blocked.categories == []
@@ -53,7 +53,7 @@ def _write(tmp_path, intel_list, lang="en"):
 def test_csv_has_status_column_and_empty_cells_for_blocked(tmp_path, analyzed, blocked):
     _, rows, _ = _write(tmp_path, [analyzed["shopify_basic"], blocked])
     assert [r["status"] for r in rows] == ["ok", "blocked"]
-    assert rows[1]["fetch_attempts"] == "requests 403; cloudscraper 403"
+    assert rows[1]["fetch_attempts"] == "requests 403; honest-ua 403; cloudscraper 403"
     assert {f: rows[1][f] for f in CSV_FIELDS} == {f: "" for f in CSV_FIELDS}
 
 
@@ -61,7 +61,7 @@ def test_reports_say_blocked_and_leave_it_out_of_comparisons(tmp_path, analyzed,
     ok = [analyzed["shopify_basic"], analyzed["woocommerce_promo"]]
     md, _, biz = _write(tmp_path, ok + [blocked])
 
-    assert "blocked automated access" in md and "requests (403) → cloudscraper (403)" in md
+    assert "blocked automated access" in md and "requests (403) → requests with the tool's own User-Agent (403) → cloudscraper (403)" in md
     table = md.split("Comparison Table", 1)[1]
     assert sum(1 for line in table.splitlines() if line.startswith("| 127.0.0.1")) == 2
     assert md.count("Competitive pressure score (rule-based)") == 2

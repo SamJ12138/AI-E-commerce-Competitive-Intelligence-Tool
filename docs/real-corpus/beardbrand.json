@@ -1,0 +1,125 @@
+{
+  "store": "beardbrand",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "written_before_tool_output": true,
+  "url": "https://www.beardbrand.com/",
+  "category": "men's grooming / fragrance",
+  "in_sites_txt": true,
+  "status": "ok",
+  "pages_read": [
+    "https://www.beardbrand.com/",
+    "https://www.beardbrand.com/collections/beard-oil",
+    "https://www.beardbrand.com/products/fox-hunt-mens-cologne",
+    "https://www.beardbrand.com/products/black-sails-mens-cologne",
+    "https://www.beardbrand.com/products/utility-beard-trimmer",
+    "https://www.beardbrand.com/products/custom-mens-cologne-set",
+    "https://www.beardbrand.com/pages/returns-exchanges",
+    "https://www.beardbrand.com/pages/faqs",
+    "https://www.beardbrand.com/products/old-money-beard-oil",
+    "https://www.beardbrand.com/products/alliance-membership"
+  ],
+  "notes": [
+    "Replaces pfrankmd.com (a dermatology clinic site, not a store) in sites.txt and the corpus.",
+    "robots.txt disallows /policies/, so the Shopify policy pages were not read; shipping and returns terms come from /pages/faqs and /pages/returns-exchanges.",
+    "custom-mens-cologne-set was read but is not used as a ground-truth product: it is a bundle builder whose page shows 'Product price: $0.00' while its JSON-LD says 170.0."
+  ],
+  "fields": {
+    "platform": {
+      "value": "Shopify",
+      "source": "https://www.beardbrand.com/",
+      "evidence": "robots.txt '# we use Shopify as our ecommerce platform'; cdn.shopify.com assets, apple-pay-shop-capabilities and shopify-features scripts in the homepage HTML"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Fox Hunt Men's Cologne",
+          "url": "https://www.beardbrand.com/products/fox-hunt-mens-cologne",
+          "price": 50.0,
+          "compare_at": null,
+          "source": "https://www.beardbrand.com/products/fox-hunt-mens-cologne",
+          "evidence": "Product price: $50.00; JSON-LD price 50.0; product JSON compare_at_price null"
+        },
+        {
+          "title": "Black Sails Men's Cologne",
+          "url": "https://www.beardbrand.com/products/black-sails-mens-cologne",
+          "price": 50.0,
+          "compare_at": null,
+          "source": "https://www.beardbrand.com/products/black-sails-mens-cologne",
+          "evidence": "JSON-LD price 50.0; product JSON price 5000 (cents), compare_at_price null"
+        },
+        {
+          "title": "Utility Beard Trimmer",
+          "url": "https://www.beardbrand.com/products/utility-beard-trimmer",
+          "price": 124.95,
+          "compare_at": null,
+          "source": "https://www.beardbrand.com/products/utility-beard-trimmer",
+          "evidence": "Product price: $124.95; JSON-LD price 124.95; compare_at_price null"
+        },
+        {
+          "title": "Old Money Beard Oil",
+          "url": "https://www.beardbrand.com/products/old-money-beard-oil",
+          "price": 29.0,
+          "price_range": [
+            29.0,
+            39.0
+          ],
+          "compare_at": null,
+          "source": "https://www.beardbrand.com/products/old-money-beard-oil",
+          "evidence": "Product price: $29.00 (1.7 fl oz); JSON-LD offers 29.0 (1.7 fl oz) and 39.0 (4 fl oz); collection card 'From $29'; no compare-at"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no product on the pages read shows a struck-through or compare-at price"
+    },
+    "free_shipping_threshold": {
+      "value": 100.0,
+      "source": "https://www.beardbrand.com/pages/faqs",
+      "evidence": "Luxury shipping is free for US domestic orders over $100 (excludes gift cards); 'Free luxury shipping on US orders $100+' on collection and product pages; product JSON-LD freeShippingThreshold 100.00",
+      "note": "the homepage does not state it"
+    },
+    "return_days": {
+      "value": 120,
+      "source": "https://www.beardbrand.com/pages/returns-exchanges",
+      "evidence": "We offer full refunds (including shipping) as long as our payment processor allows it (usually up to 120 days from the date of purchase). After 120 days, we can do a refund as store credit. Product pages: 'Full refund up to 120 days from order'"
+    },
+    "free_returns": {
+      "value": true,
+      "source": "https://www.beardbrand.com/pages/faqs",
+      "evidence": "We will provide you with a complimentary return label; returns page: full refunds (including shipping); product JSON-LD returnFees FreeReturn"
+    },
+    "payment_methods": {
+      "value": [
+        "American Express",
+        "Apple Pay",
+        "Discover",
+        "Elo",
+        "Google Pay",
+        "JCB",
+        "Mastercard",
+        "PayPal",
+        "Shop Pay",
+        "Venmo",
+        "Visa"
+      ],
+      "source": "https://www.beardbrand.com/",
+      "evidence": "homepage <script id=\"apple-pay-shop-capabilities\"> supportedNetworks [visa, masterCard, discover, amex, elo, jcb], shopifyPaymentsEnabled true; <meta id=\"in-context-paypal-metadata\" data-venmo-supported=\"true\">; product pages <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\">; FAQ: 'Beardbrand accepts Visa, MasterCard, American Express, and Discover. We also accept Beardbrand Gift Cards, Shopify Pay, Google Pay, and PayPal.' No payment icons on the pages read."
+    },
+    "review_platform": {
+      "value": "Judge.me",
+      "source": "https://www.beardbrand.com/products/fox-hunt-mens-cologne",
+      "evidence": "Judge.me app block and jdgm-widget markup; '(26 reviews)' next to the price"
+    },
+    "has_loyalty": {
+      "value": true,
+      "source": "https://www.beardbrand.com/products/alliance-membership",
+      "evidence": "Alliance: 'When you purchase directly from Beardbrand three times or spend $150 on a single order, you'll receive an email invite to become a member'; members get free standard shipping on domestic orders, $5 off premium shipping, pre-market product access (also sold for a one-time $90)",
+      "note": "a membership earned by repeat purchases, not a points program; the homepage only shows the menu entry 'Alliance Membership'"
+    },
+    "has_email_capture": {
+      "value": true,
+      "source": "https://www.beardbrand.com/",
+      "evidence": "'Grow Your Mind' newsletter form: <input type=\"email\" placeholder=\"enter your email address\" name=\"contact[email]\"> with a Subscribe button"
+    }
+  }
+}

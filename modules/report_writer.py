@@ -20,10 +20,10 @@ from .pressure_score import FACTOR_NAMES, RULES, format_input, score_pressure
 logger = logging.getLogger(__name__)
 
 BRANCH_NAMES = {
-    'en': {'requests': 'requests', 'browser': 'browser', 'cloudscraper': 'cloudscraper',
-           'no response': 'no response'},
-    'zh': {'requests': 'HTTP 请求', 'browser': '浏览器', 'cloudscraper': 'cloudscraper',
-           'no response': '无响应'},
+    'en': {'requests': 'requests', 'honest-ua': 'requests with the tool\'s own User-Agent',
+           'browser': 'browser', 'cloudscraper': 'cloudscraper', 'no response': 'no response'},
+    'zh': {'requests': 'HTTP 请求', 'honest-ua': '标明工具身份的 HTTP 请求', 'browser': '浏览器',
+           'cloudscraper': 'cloudscraper', 'no response': '无响应'},
 }
 NOT_SEEN_TEXT = {
     'en': {

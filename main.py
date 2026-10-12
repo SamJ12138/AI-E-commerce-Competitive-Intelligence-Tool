@@ -12,7 +12,7 @@ Usage:
 
 Example sites:
     https://rastaclat.com
-    https://pfrankmd.com
+    https://www.beardbrand.com
     https://allbirds.com
 """
 
@@ -354,6 +354,9 @@ def analyze_site(
         if progress and task_id is not None:
             progress.update(task_id, description=f"[cyan]{domain}[/cyan]: {msg}")
     
+    # robots.txt Crawl-delay (None with --ignore-robots): per-host delay = max(config, Crawl-delay)
+    client.apply_crawl_delay(url, robots_checker.get_crawl_delay(url))
+
     # Step 1: Fetch homepage
     update_progress("Fetching homepage...")
     obs.set_page(url)

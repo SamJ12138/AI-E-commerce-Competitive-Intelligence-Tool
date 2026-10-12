@@ -1,11 +1,12 @@
 """Checks on the fixture stores themselves: they serve what fixtures.json says."""
 
 import re
+import time
 
 import pytest
 import requests
 
-from server import STORES_DIR, load_ground_truth
+from server import STORES_DIR, StoreServer, load_ground_truth
 
 OK_STORES = ("shopify_basic", "woocommerce_promo")
 
@@ -78,3 +79,17 @@ def test_requests_are_recorded(fixture_stores):
     log = srv.request_log()
     assert len(log) == before + 1
     assert log[-1]["path"] == "/robots.txt" and log[-1]["status"] == 200
+
+
+def test_a_request_is_recorded_before_its_response_is_sent(monkeypatch):
+    # The client can return before the server thread runs again; a request recorded after the
+    # body was written could be missing from request_log() (seen as a flaky test_page_loop).
+    record = StoreServer._record
+
+    def slow_record(self, *args):
+        time.sleep(0.3)
+        record(self, *args)
+    monkeypatch.setattr(StoreServer, "_record", slow_record)
+    with StoreServer("shopify_basic") as srv:
+        requests.get(srv.base_url + "/robots.txt", timeout=5)
+        assert [r["path"] for r in srv.request_log()] == ["/robots.txt"]

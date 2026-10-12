@@ -75,10 +75,19 @@ def undecodable_encoding(headers) -> Optional[str]:
             return token.strip()
     return None
 
-from .models import Config
+from .models import Config, HONEST_USER_AGENT
 from . import obs
 
 logger = logging.getLogger(__name__)
+
+# Who each fetch branch says it is (recorded in the obs log for every attempt).
+IDENTITIES = {
+    'requests': 'browser-like headers',
+    'browser->requests': 'browser-like headers',
+    'honest-ua': 'honest User-Agent',
+    'cloudscraper': 'cloudscraper (Chrome)',
+    'browser': 'headless browser',
+}
 
 
 class RateLimiter:
@@ -86,15 +95,23 @@ class RateLimiter:
     
     def __init__(self, delay: float = 1.5):
         self.delay = delay
+        self.delays: Dict[str, float] = {}  # per-host delay (robots.txt Crawl-delay)
         self.last_request: Dict[str, float] = {}
-    
+
+    def set_delay(self, domain: str, delay: float) -> None:
+        self.delays[domain] = delay
+
+    def delay_for(self, domain: str) -> float:
+        return self.delays.get(domain, self.delay)
+
     def wait(self, domain: str) -> None:
         """Wait if necessary before making a request to the domain."""
         now = time.time()
+        delay = self.delay_for(domain)
         if domain in self.last_request:
             elapsed = now - self.last_request[domain]
-            if elapsed < self.delay:
-                sleep_time = self.delay - elapsed
+            if elapsed < delay:
+                sleep_time = delay - elapsed
                 logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s for {domain}")
                 time.sleep(sleep_time)
         self.last_request[domain] = time.time()
@@ -126,6 +143,7 @@ class HttpClient:
         self.last_headers = {}  # response headers of the last fetch() (read by analyze_site)
         self.served_counts = {}  # netloc -> {branch that served a usable page: count}
         self.session = self._create_session()
+        self.honest_session = self._create_honest_session()
         self.cloudscraper_session = self._create_cloudscraper() if CLOUDSCRAPER_AVAILABLE else None
         self._playwright = None
         self._browser = None
@@ -170,20 +188,37 @@ class HttpClient:
             logger.warning(f"Failed to create cloudscraper: {e}")
             return None
     
-    def _create_session(self) -> requests.Session:
-        """Create a requests session with retry logic."""
-        session = requests.Session()
-        
-        # Configure retries
+    @staticmethod
+    def _mount_retries(session: requests.Session) -> None:
+        # raise_on_status=False: after the last retry the 429 / 5xx response itself is returned
+        # (before, it surfaced as a RetryError with no status, i.e. "no HTTP answer").
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "OPTIONS"]
+            allowed_methods=["HEAD", "GET", "OPTIONS"],
+            raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
+
+    def _create_honest_session(self) -> requests.Session:
+        """A session that says what it is: the tool's name and repository, no browser headers."""
+        session = requests.Session()
+        self._mount_retries(session)
+        session.headers.update({
+            "User-Agent": HONEST_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br" if BROTLI_AVAILABLE else "gzip, deflate",
+        })
+        return session
+
+    def _create_session(self) -> requests.Session:
+        """Create a requests session with retry logic."""
+        session = requests.Session()
+        self._mount_retries(session)
         
         # Set default headers - more complete to look like real browser
         session.headers.update({
@@ -306,6 +341,21 @@ class HttpClient:
         if self._playwright:
             self._playwright.stop()
         self.session.close()
+        self.honest_session.close()
+
+    def apply_crawl_delay(self, url: str, crawl_delay: Optional[float]) -> float:
+        """Per-host delay = max(config rate_limit_delay, robots.txt Crawl-delay); returns it."""
+        host = urlparse(url).netloc
+        base = self.config.rate_limit_delay
+        delay = max(base, crawl_delay or 0)
+        self.rate_limiter.set_delay(host, delay)
+        raised = delay > base
+        obs.event("robots", "success", kind="crawl_delay", url=url, host=host, crawl_delay=crawl_delay,
+                  config_delay=base, delay=delay, raised=raised)
+        if raised:
+            logger.info(f"robots.txt Crawl-delay {crawl_delay} s raises the delay between requests to "
+                        f"{host} from {base} s to {delay} s")
+        return delay
     
     def fetch(
         self,
@@ -351,6 +401,12 @@ class HttpClient:
             # Try regular requests first
             result = self._attempt('requests', self._fetch_with_requests, url, chain)
 
+            # Refused (403 / 429): ask once more, saying who is asking
+            if result[1] in (403, 429):
+                logger.info(f"Requests got {result[1]}, retrying {domain} once with the tool's own User-Agent")
+                self.rate_limiter.wait(domain)
+                result = self._attempt('honest-ua', self._fetch_with_honest_ua, url, chain)
+
             # If 403, try cloudscraper
             if result[1] == 403 and CLOUDSCRAPER_AVAILABLE and self.cloudscraper_session:
                 logger.info(f"Requests got 403, trying cloudscraper for {domain}")
@@ -365,9 +421,11 @@ class HttpClient:
         self._served_by_override = None
         result = fn(url)
         html, status, headers, error = result
+        served_by = self._served_by_override or branch
         chain.append({
             'branch': branch,
-            'served_by': self._served_by_override or branch,
+            'served_by': served_by,
+            'identity': IDENTITIES.get(served_by, served_by),
             'status': status,
             'bytes': len(html.encode('utf-8', 'replace')) if html else 0,
             'error': error,
@@ -385,12 +443,14 @@ class HttpClient:
             counts = self.served_counts.setdefault(urlparse(url).netloc, {})
             branch = last.get('served_by') or 'unknown'
             counts[branch] = counts.get(branch, 0) + 1
+        served = bool(html and not error)
         obs.event(
-            "fetch", "success" if (html and not error) else "fail",
+            "fetch", "success" if served else "fail",
             duration_ms=timer.ms(),
             error_type=obs.classify_fetch(status, error) if error else (None if html else "http"),
             error_message=error if error else (None if html else "Empty response"),
             url=url, status=status, served_by=last.get('served_by'),
+            identity=last.get('identity') if served else None,
             bytes=last.get('bytes', 0), chain=chain, render_js=use_js,
             rate_limit_wait_ms=round(wait_ms, 2),
             caller_stage=obs.current_stage(),
@@ -439,11 +499,25 @@ class HttpClient:
         url: str
     ) -> Tuple[Optional[str], int, Dict[str, str], Optional[str]]:
         """Fetch using requests library."""
+        return self._get(self.session, url)
+
+    def _fetch_with_honest_ua(
+        self,
+        url: str
+    ) -> Tuple[Optional[str], int, Dict[str, str], Optional[str]]:
+        """Fetch with the tool's own User-Agent (name and repository URL) and no browser headers."""
+        return self._get(self.honest_session, url)
+
+    def _get(
+        self,
+        session: requests.Session,
+        url: str
+    ) -> Tuple[Optional[str], int, Dict[str, str], Optional[str]]:
         try:
             # Suppress SSL warnings for self-signed certs
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                response = self.session.get(
+                response = session.get(
                     url,
                     timeout=self.config.timeout,
                     verify=True,  # Will retry with verify=False if needed
@@ -472,13 +546,13 @@ class HttpClient:
             return response.text, response.status_code, headers, None
             
         except requests.exceptions.SSLError as e:
-            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+            obs.swallowed("http_client.py:_get", error_type="http",
                           fallback="retry with verify=False", stage="fetch", url=url)
             logger.debug(f"SSL error for {url}, retrying without verification")
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    response = self.session.get(
+                    response = session.get(
                         url,
                         timeout=self.config.timeout,
                         verify=False,
@@ -489,22 +563,22 @@ class HttpClient:
                     return None, response.status_code, dict(response.headers), f"Undecodable Content-Encoding: {bad}"
                 return response.text, response.status_code, dict(response.headers), None
             except Exception as e2:
-                obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+                obs.swallowed("http_client.py:_get", error_type="http",
                               fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
                 return None, 0, {}, f"SSL error: {str(e2)}"
 
         except requests.exceptions.Timeout:
-            obs.swallowed("http_client.py:_fetch_with_requests", error_type="timeout",
+            obs.swallowed("http_client.py:_get", error_type="timeout",
                           fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Timeout after {self.config.timeout}s"
 
         except requests.exceptions.ConnectionError as e:
-            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+            obs.swallowed("http_client.py:_get", error_type="http",
                           fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Connection error: {str(e)}"
 
         except requests.exceptions.RequestException as e:
-            obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
+            obs.swallowed("http_client.py:_get", error_type="http",
                           fallback="returned (None, 0, {}, error)", stage="fetch", url=url)
             return None, 0, {}, f"Request error: {str(e)}"
     

@@ -81,7 +81,8 @@ respected; allbirds disallows `/policies/`, so its shipping policy was not read.
 
 `scripts/real_corpus.py run` ran main.py once per store with default settings, except that the
 cloudscraper fallback was switched off in the launching process (real-site runs never take the
-cloudscraper path). `score` wrote `docs/real-corpus/scores.md`. Nothing was fixed in this batch.
+cloudscraper path). `score` wrote `docs/real-corpus/scores.md` (renamed `scores-baseline.md` in
+Phase 4). Nothing was fixed in this batch.
 
 | store | status | match | partial | mismatch | missing |
 |---|---|---|---|---|---|
@@ -229,7 +230,7 @@ against the current ground truth:
 | fix 4 FAQ / help pages (after Batch 4) | 62 | 4 | 6 | 8 |
 
 Per store (match / partial / mismatch / missing), baseline -> after Batch 4
-(`docs/real-corpus/scores.md` -> `docs/real-corpus/scores-after-batch4.md`):
+(`docs/real-corpus/scores-baseline.md` -> `docs/real-corpus/scores-after-batch4.md`):
 
 | store | before | after |
 |---|---|---|

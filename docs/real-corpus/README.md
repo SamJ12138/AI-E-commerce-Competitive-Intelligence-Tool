@@ -4,15 +4,19 @@ Eight public stores, ground truth written by hand on 2026-10-12. Each `<store>.j
 the URL each fact came from, with a short note on what the page says. No page HTML is kept here:
 it is the stores' content.
 
+The ground truth for a store is written before the tool's output for that store is read. beardbrand, which replaced pfrankmd.com (a clinic site with no shop), was the
+first store added under this rule. Before it, one correction was made after a tool run had been
+read: the Shopify payment methods (see `payment_methods.corrected` in those files).
+
 | store | url | platform | category | why it is here |
 |---|---|---|---|---|
 | rastaclat | https://rastaclat.com/ | Shopify | bracelets | sites.txt |
-| pfrankmd | https://pfrankmd.com/ | none (clinic site) | dermatology clinic | sites.txt; no longer a store (see its notes) |
+| beardbrand | https://www.beardbrand.com/ | Shopify | men's grooming | sites.txt (replaced pfrankmd.com, not a store) |
 | allbirds | https://www.allbirds.com/ | Shopify | footwear | sites.txt |
 | deathwishcoffee | https://www.deathwishcoffee.com/ | Shopify | coffee | Shopify, another category |
 | brooklinen | https://www.brooklinen.com/ | Shopify | bedding | Shopify, another category; JS-rendered navigation and prices |
 | porterandyork | https://porterandyork.com/ | WooCommerce | meat (perishable) | WooCommerce |
-| barefootbuttons | https://barefootbuttons.com/ | WooCommerce | guitar accessories | WooCommerce |
+| barefootbuttons | https://barefootbuttons.com/ | WooCommerce | guitar accessories | WooCommerce; refuses browser-like requests |
 | louboutin | https://us.christianlouboutin.com/us_en/ | Magento | luxury footwear | expected to block: Cloudflare challenge (403) |
 
 ## How the facts were read
@@ -52,6 +56,9 @@ it is the stores' content.
 python scripts/real_corpus.py run --out-root <dir>       # one main.py run per store (real sites)
 python scripts/real_corpus.py score --out-root <dir> --md docs/real-corpus/scores.md
 ```
+
+`scores.md` is the current table; `scores-baseline.md` (before any fix) and
+`scores-after-batch4.md` (pfrankmd still in the corpus) are kept as history.
 
 `run` uses default settings except that the cloudscraper fallback is switched off (real-site runs
 never take the cloudscraper path), so a 403 ends on `requests 403`. `score` writes per store and

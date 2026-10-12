@@ -14,6 +14,12 @@ Routing for a normal store:
 
 The "blocked" store answers every path, robots.txt included, with 403 and a
 Cloudflare-style challenge body.
+
+Options for any store:
+    refuse_browser_ua=True  answer 403 to every request that looks like a browser (a
+                            "Mozilla/" User-Agent or Sec-Fetch-* headers), robots.txt included,
+                            and serve the store to anything else (one real store did this).
+    robots_txt="..."        serve this text as /robots.txt instead of the store's file.
 """
 
 import json
@@ -50,13 +56,16 @@ def load_ground_truth(store: str) -> Dict:
 class StoreServer:
     """One fixture store served on 127.0.0.1 from a daemon thread."""
 
-    def __init__(self, store: str, host: str = "127.0.0.1", port: int = 0):
+    def __init__(self, store: str, host: str = "127.0.0.1", port: int = 0,
+                 refuse_browser_ua: bool = False, robots_txt: Optional[str] = None):
         if store not in STORE_NAMES:
             raise ValueError(f"unknown fixture store: {store}")
         self.store = store
         self.root = STORES_DIR / store
         self.truth = load_ground_truth(store)
         self.extra_headers: Dict[str, str] = self.truth.get("response_headers", {})
+        self.refuse_browser_ua = refuse_browser_ua
+        self.robots_txt = robots_txt
         self.requests: List[Dict] = []
         self._lock = threading.Lock()
         self._httpd = ThreadingHTTPServer((host, port), self._make_handler())
@@ -127,6 +136,9 @@ class StoreServer:
                 return server.extra_headers.get("Server", "fixture")
 
             def _send(self, status: int, body: bytes, content_type: str) -> None:
+                # Recorded before the response goes out: once the client has the body, the request
+                # is in request_log().
+                server._record(self.command, self.path, status, self.headers.get("User-Agent", ""))
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(body)))
@@ -136,9 +148,19 @@ class StoreServer:
                 self.end_headers()
                 if self.command != "HEAD":
                     self.wfile.write(body)
-                server._record(self.command, self.path, status, self.headers.get("User-Agent", ""))
+
+            def _browser_like(self) -> bool:
+                ua = self.headers.get("User-Agent", "")
+                return "Mozilla/" in ua or any(k.lower().startswith("sec-fetch-") for k in self.headers)
 
             def _answer(self) -> None:
+                if server.refuse_browser_ua and self._browser_like():
+                    self._send(403, b"<html><body><h1>403 Forbidden</h1></body></html>",
+                               CONTENT_TYPES[".html"])
+                    return
+                if server.robots_txt is not None and urlsplit(self.path).path == "/robots.txt":
+                    self._send(200, server.robots_txt.encode("utf-8"), CONTENT_TYPES[".txt"])
+                    return
                 if server.store == "blocked":
                     host = self.headers.get("Host", "127.0.0.1")
                     body = (server.root / "challenge.html").read_text(encoding="utf-8")

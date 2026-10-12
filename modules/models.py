@@ -358,6 +358,11 @@ class ChangeReport:
         }
 
 
+# Sent once more for a URL that answered 403 / 429 to the browser-like headers (and for robots.txt).
+REPO_URL = "https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool"
+HONEST_USER_AGENT = f"ECI-Tool/1.0 (E-commerce Competitive Intelligence Tool; +{REPO_URL})"
+
+
 @dataclass
 class Config:
     """Application configuration."""

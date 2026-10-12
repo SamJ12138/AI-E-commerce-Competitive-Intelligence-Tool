@@ -5,8 +5,8 @@
 # Example Shopify sites (bracelet/accessories)
 https://rastaclat.com
 
-# Example skincare/beauty DTC
-https://pfrankmd.com
+# Example men's grooming DTC
+https://www.beardbrand.com
 
 # Example sustainable footwear
 https://allbirds.com

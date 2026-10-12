@@ -49,20 +49,22 @@ def client(monkeypatch):
 
 @pytest.mark.parametrize("render_js", [False, True])
 def test_fetch_returns_only_bodies_a_transport_received(client, render_js):
-    combos = itertools.product(OUTCOMES, repeat=2)
-    for url, (first, second) in itertools.product(URLS, combos):
+    combos = itertools.product(OUTCOMES, repeat=3)
+    for url, (first, honest, second) in itertools.product(URLS, combos):
         sent = set()
         first_branch = "browser" if render_js else "requests"
         client._fetch_with_playwright = _transport("browser", first, sent)
         client._fetch_with_requests = _transport("requests", first, sent)
+        client._fetch_with_honest_ua = _transport("honest-ua", honest, sent)
         client._fetch_with_cloudscraper = _transport("cloudscraper", second, sent)
 
         html, status, headers, error = client.fetch(url, render_js=render_js)
 
-        case = f"{url} {first_branch}={first} cloudscraper={second}"
+        case = f"{url} {first_branch}={first} honest-ua={honest} cloudscraper={second}"
         assert html is None or html in sent, case
         tried = [a["branch"] for a in client.last_chain]
-        assert set(tried) <= {first_branch, "cloudscraper"}, case
+        assert set(tried) <= {first_branch, "honest-ua", "cloudscraper"}, case
+        assert render_js is False or "honest-ua" not in tried, case
         # The status returned is the status of the last branch tried, never one the tool chose.
         assert status == client.last_chain[-1]["status"], case
         if status != 200:
@@ -88,6 +90,9 @@ def test_a_formerly_protected_site_ends_blocked_on_what_it_returned(client):
 
         def get_sitemaps(self, url):
             return []
+
+        def get_crawl_delay(self, url):
+            return None
 
     client.config.render_js = True
     sent = set()

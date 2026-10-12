@@ -1,0 +1,72 @@
+# Phase 4 changes
+
+Release preparation. One section per batch, in commit order. Each code change: RED test first, then
+the fix, full suite through the pre-commit hook.
+
+## Batch A - honest-User-Agent retry, Crawl-delay, a store instead of a clinic
+
+### Honest-User-Agent retry
+
+- Default chain: the browser-like request goes first, as before. On a 403 or 429 the same URL is
+  asked once more by the `honest-ua` branch: User-Agent
+  `ECI-Tool/1.0 (E-commerce Competitive Intelligence Tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)`
+  with plain Accept / Accept-Language / Accept-Encoding and none of the browser headers
+  (`sec-ch-ua`, `Sec-Fetch-*`, `Upgrade-Insecure-Requests`, `DNT`). It waits the per-host delay
+  first. A 403 after that goes on to cloudscraper as before; a 429 does not (cloudscraper only ever
+  followed a 403). The `--render-js` chain (browser, then cloudscraper) is unchanged.
+- robots.txt gets the same retry: a 403/429 to the browser-like User-Agent is asked once more with
+  the honest one before it is taken as "no robots.txt" (RFC 9309 4xx).
+- 429 now reaches the chain: urllib3 retried 429 itself and, after the last retry, raised a
+  RetryError, so `fetch()` saw status 0 ("no HTTP answer") and a rate-limited site was reported as
+  unreachable. `raise_on_status=False` returns the final 429 response.
+- Every chain entry in the obs `fetch` event carries `identity` (browser-like headers / honest
+  User-Agent / cloudscraper (Chrome) / headless browser); the event's own `identity` is the one
+  that got the page. Reports name the branch ("requests with the tool's own User-Agent").
+- Fixture: `StoreServer(..., refuse_browser_ua=True)` answers 403 to anything with a `Mozilla/`
+  User-Agent or `Sec-Fetch-*` headers, robots.txt included (barefootbuttons' behaviour), and serves
+  the store otherwise. shopify_basic behind it ends `status=ok` with every page asked twice
+  (403, then 200) and Shopify's robots rules applied.
+- RED (sources unchanged, new tests): `tests/test_honest_ua.py` 10 of 13 failed (status
+  `blocked`; robots.txt never retried; chains `requests -> cloudscraper`; a 429 came back as status
+  0); the 200 / 404 / `--render-js` chain cases passed. `test_blocked.py` (2) and
+  `test_fetch_provenance.py` now spell out the `honest-ua` step.
+
+### robots.txt Crawl-delay
+
+- `analyze_site` sets the per-host delay to `max(rate_limit_delay, Crawl-delay)` before the first
+  request to the site. `RateLimiter` keeps per-host delays (`delay_for(host)`). An obs `robots`
+  event `kind=crawl_delay` records Crawl-delay, the config delay and the delay used; when
+  Crawl-delay raises it, a log line says so ("robots.txt Crawl-delay 60 s raises the delay between
+  requests to ... from 1.5 s to 60 s"). `--ignore-robots` ignores Crawl-delay too.
+- Crawl-delay is read from the `User-agent: *` group (the group `is_allowed()` reads) by the tool
+  itself: robotexclusionrulesparser drops a group that has no Allow/Disallow line, so
+  `User-agent: *` + `Crawl-delay: 5` alone came back as None.
+- RED: `tests/test_crawl_delay.py` 6 of 6 failed (no per-host delay). Absent and smaller keep the
+  config delay; larger (0.6 s over 0.1 s) spaces the fixture store's page requests at least 0.55 s
+  apart; another agent's Crawl-delay does not apply.
+
+### Real stores
+
+- **barefootbuttons, rerun once** (cloudscraper off, default settings): `blocked` (requests 403)
+  -> `ok`. robots.txt and all 9 pages answered 403 to the browser-like request; the honest retry got
+  200 on 7 pages and 404 on one guessed page; `/privacy-policy` ended "Exceeded 30 redirects" on the
+  browser-like request (no retry: not a 403/429). Score 3/0/1/6 -> 8/0/2/0 (two new single-store
+  misses, docs/observations.md section 9).
+- **pfrankmd.com replaced by beardbrand.com** (Shopify, men's grooming) in sites.txt, main.py's
+  examples and the corpus. Ground truth read first (10 pages, same method as the other stores,
+  `docs/real-corpus/beardbrand.json`), then one tool run: 5/1/2/2.
+- `docs/real-corpus/scores.md` is now the current table (8 stores; six of them are the Phase 3
+  Batch 4 runs); the Phase 3 baseline moved to `scores-baseline.md`. Totals over 80 store-fields:
+  62 match / 5 partial / 9 mismatch / 4 missing.
+
+### A race in the fixture server
+
+The first commit attempt was refused by the hook: `test_page_loop.py::test_policies_are_read_after_max_products_is_reached`
+failed once (the request log lacked `/policies/refund-policy`, the last page fetched) and passed on
+rerun; 1 failure in 8 full-suite runs. `StoreServer` recorded a request after writing its
+response, so a test reading `request_log()` as soon as the client had the body could miss the last
+request. It now records first. RED: `test_a_request_is_recorded_before_its_response_is_sent`
+(the recording delayed by 0.3 s) saw an empty log.
+
+Tests 238 -> 258. Fixture scores 17/0/0 on all four runs; the blocked runs now make 5 and 6
+requests (robots.txt and the homepage are each asked once more with the honest User-Agent).

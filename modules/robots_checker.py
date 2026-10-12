@@ -12,10 +12,41 @@ from urllib.parse import urlparse, urljoin
 import requests
 from robotexclusionrulesparser import RobotExclusionRulesParser
 
-from .models import Config
+from .models import Config, HONEST_USER_AGENT
 from . import obs
 
 logger = logging.getLogger(__name__)
+
+
+def crawl_delay_for_all_agents(text: str) -> Optional[float]:
+    """Crawl-delay of the `User-agent: *` group (the group is_allowed() reads), or None.
+
+    Read here because robotexclusionrulesparser drops a group that has no Allow/Disallow line.
+    """
+    agents: List[str] = []
+    in_agent_lines = False
+    for raw in text.splitlines():
+        line = raw.split('#', 1)[0].strip()
+        if ':' not in line:
+            continue
+        key, _, value = line.partition(':')
+        key, value = key.strip().lower(), value.strip()
+        if key == 'user-agent':
+            if not in_agent_lines:
+                agents = []
+            agents.append(value.lower())
+            in_agent_lines = True
+            continue
+        in_agent_lines = False
+        if key == 'crawl-delay' and '*' in agents:
+            try:
+                delay = float(value)
+            except ValueError:
+                obs.swallowed("robots_checker.py:crawl_delay_for_all_agents", error_type="parse",
+                              fallback="ignore this Crawl-delay line", stage="robots")
+                continue
+            return delay if delay > 0 else None
+    return None
 
 
 class RobotsChecker:
@@ -32,6 +63,7 @@ class RobotsChecker:
         self.user_agent = config.user_agent
         self.blocked_urls: List[str] = []  # Track blocked URLs for evidence
         self.unreachable: Dict[str, str] = {}  # netloc -> why robots.txt could not be read
+        self.texts: Dict[str, str] = {}  # netloc -> robots.txt body (2xx only)
 
     def _get_robots_url(self, url: str) -> str:
         """Get the robots.txt URL for a given URL."""
@@ -55,6 +87,14 @@ class RobotsChecker:
                 timeout=timeout,
                 headers={"User-Agent": self.user_agent}
             )
+            if response.status_code in (403, 429):
+                # Refused to the browser-like User-Agent: ask once more, saying who is asking.
+                refused = response.status_code
+                response = requests.get(robots_url, timeout=timeout,
+                                        headers={"User-Agent": HONEST_USER_AGENT})
+                obs.event("robots", "success" if 200 <= response.status_code < 300 else "fail",
+                          kind="robots_honest_retry", url=robots_url, first_status=refused,
+                          status=response.status_code, identity="honest User-Agent")
         except requests.exceptions.TooManyRedirects:
             # RFC 9309 2.3.1.2: more than five redirects MAY be treated as unavailable.
             obs.swallowed("robots_checker.py:_fetch_robots", error_type="http",
@@ -82,6 +122,7 @@ class RobotsChecker:
         if ok:
             parser = RobotExclusionRulesParser()
             parser.parse(response.text)
+            self.texts[domain] = response.text
             logger.debug(f"Loaded robots.txt from {robots_url}")
             return parser
         if status >= 500:
@@ -193,8 +234,7 @@ class RobotsChecker:
             return None
         
         try:
-            delay = parser.get_crawl_delay("*")
-            return float(delay) if delay else None
+            return crawl_delay_for_all_agents(self.texts.get(urlparse(url).netloc, ""))
         except Exception:
             obs.swallowed("robots_checker.py:get_crawl_delay", error_type="parse", fallback="None",
                           stage="robots", url=url)

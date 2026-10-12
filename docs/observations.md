@@ -361,7 +361,7 @@ source next to each scored value.
 
 ## 7. Real-store corpus (Phase 3 Batch 3)
 
-Measured against eight real stores (`docs/real-corpus/`, scores in `docs/real-corpus/scores.md`):
+Measured against eight real stores (`docs/real-corpus/`, scores in `docs/real-corpus/scores-baseline.md`):
 
 - **Brotli responses parsed as HTML.** `HttpClient._create_session()` advertises
   `Accept-Encoding: gzip, deflate, br`; without `brotli` / `brotlicffi` installed urllib3 does not
@@ -383,6 +383,7 @@ From `docs/real-corpus/scores-after-batch4.md`. Each occurs on one store only, o
 - **barefootbuttons: blocked by the tool's own headers.** nginx answers 403 to the Chrome User-Agent
   and browser header set and 200 to an honest one (section 7). With cloudscraper off for real-site
   runs the store ends `blocked`, `requests 403`, every field null. A3 keeps the header set.
+  *Resolved in Phase 4 Batch A* by the honest-User-Agent retry (section 9).
 - **allbirds: free_returns True from the homepage JS fallback.** `extract_policies_from_homepage_js`
   pattern 1 sets free_returns when "free shipping" and "free returns" both occur anywhere in the raw
   homepage HTML; the returns page (now fetched) says customers pay return shipping, but it sets no
@@ -410,3 +411,29 @@ From `docs/real-corpus/scores-after-batch4.md`. Each occurs on one store only, o
 - **porterandyork: has_email_capture False.** No email field in the HTML; Klaviyo's onsite script is
   loaded and may inject one. Ground truth is null (undeterminable from the HTML), so any definite
   value scores as a mismatch.
+
+## 9. Phase 4 Batch A: honest-User-Agent retry and the new corpus store
+
+From `docs/real-corpus/scores.md` (barefootbuttons and beardbrand runs of 2026-10-12).
+
+- **barefootbuttons: blocked -> ok** (3/0/1/6 -> 8/0/2/0). robots.txt and every page answered 403 to
+  the browser-like request and 200 (one 404) to the retry with the tool's own User-Agent; the obs
+  `fetch` events record `served_by: honest-ua`, `identity: honest User-Agent`. Every page is asked
+  twice (browser-like first, as decided). `/privacy-policy` ended `Exceeded 30 redirects` on the
+  browser-like request: not a 403/429, so no retry.
+- **barefootbuttons: has_email_capture True.** `input[name*="email"]` matched WooCommerce's account
+  registration field (`#reg_email`), not a newsletter signup. Ground truth: False.
+- **barefootbuttons: free_returns False where nothing is stated.** Same pattern as deathwishcoffee
+  (section 8): the accepted returns page matched no free-return pattern and the default is False.
+- **beardbrand (new, Shopify): free_shipping_threshold missing.** "Luxury shipping is free for US
+  domestic orders over $100" (FAQ) and "Free luxury shipping on US orders $100+" (product pages)
+  match no FREE_SHIPPING_PATTERNS entry; the returns page was accepted as the shipping policy.
+- **beardbrand: return_days missing.** "usually up to 120 days from the date of purchase" and "Full
+  refund up to 120 days from order" match no RETURN_DAYS_PATTERNS entry.
+- **beardbrand: free_returns False.** The FAQ's "free returns" matched, but the accepted returns page
+  (no pattern matched there) set the default False over it; "complimentary return label" is not a
+  pattern.
+- **beardbrand: has_loyalty False.** The Alliance membership (invite after three orders or a $150
+  order; free shipping and early access) uses none of the loyalty words the patterns accept.
+- **beardbrand: products 2 of 4.** Black Sails and Old Money Beard Oil are not in the 14 products the
+  run reported (sampling; not checked further).
