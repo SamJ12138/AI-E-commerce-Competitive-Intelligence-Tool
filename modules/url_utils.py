@@ -115,6 +115,20 @@ def extract_domain(url: str) -> str:
         return parsed.netloc.lower().replace('www.', '')
 
 
+def site_identity(url: str) -> str:
+    """
+    The key a site is stored and reported under: the registered domain, plus the port when
+    the URL names one. http://127.0.0.1:8899 and http://127.0.0.1:8900 are different sites.
+    """
+    domain = extract_domain(url)
+    try:
+        port = urlparse(url if '://' in url else 'https://' + url).port
+    except ValueError:
+        obs.swallowed("url_utils.py:site_identity", error_type="input_invalid", fallback="no port", url=url)
+        port = None
+    return f"{domain}:{port}" if port else domain
+
+
 def extract_full_domain(url: str) -> str:
     """
     Extract the full domain including subdomain from a URL.

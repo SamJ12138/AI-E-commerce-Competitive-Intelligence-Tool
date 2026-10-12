@@ -34,7 +34,7 @@ from rich.logging import RichHandler
 from modules import (
     Config, Platform, SiteIntelligence, ChangeReport,
     HttpClient, RobotsChecker, SnapshotStore, ReportWriter,
-    normalize_url, extract_domain, deduplicate_urls,
+    normalize_url, extract_domain, deduplicate_urls, site_identity,
     detect_platform, discover_pages,
     extract_products, calculate_price_stats,
     extract_prices_from_js, extract_price_stats_from_html,
@@ -338,7 +338,7 @@ def analyze_site(
     Returns:
         SiteIntelligence object with all extracted data
     """
-    domain = extract_domain(url)
+    domain = site_identity(url)
     logger = logging.getLogger(__name__)
     
     # Initialize intelligence object
@@ -922,7 +922,8 @@ def main(
         max_products=max_products or config_data.get('max_products', 50),
         max_pages=max_pages or config_data.get('max_pages', 20),
         monitor_mode=monitor,
-        db_path=config_data.get('db_path', 'data/intel_cache.db')
+        db_path=config_data.get('db_path', 'data/intel_cache.db'),
+        rate_limit_delay=float(config_data.get('rate_limit_delay', Config.rate_limit_delay)),
     )
     
     obs.event("load", "success", kind="config_resolved", config_keys=sorted(config_data),
@@ -931,7 +932,8 @@ def main(
               max_pages=app_config.max_pages, db_path=app_config.db_path,
               rate_limit_delay=app_config.rate_limit_delay,
               config_keys_ignored=sorted(set(config_data) - {'render_js', 'ignore_robots', 'timeout',
-                                                             'max_products', 'max_pages', 'db_path'}))
+                                                             'max_products', 'max_pages', 'db_path',
+                                                             'rate_limit_delay'}))
 
     # Initialize AI analyzer if enabled
     ai_analyzer = None
@@ -997,7 +999,7 @@ def main(
             )
             
             for url in site_urls:
-                domain = extract_domain(url)
+                domain = site_identity(url)
                 obs.set_site(url)
                 t_site = obs.Timer()
                 obs.event("site", "start", url=url, domain=domain)
@@ -1038,7 +1040,7 @@ def main(
                         change_report = snapshot_store.compute_changes(intel, language=lang)
                         change_reports[domain] = change_report
                         obs.end("change_diff", t, has_changes=bool(change_report and change_report.has_changes()),
-                                compared_with="second-newest stored snapshot (OFFSET 1), before this scan is saved")
+                                compared_with="newest stored snapshot older than this scan")
 
                         if change_report and change_report.has_changes():
                             console.print(f"[yellow]Changes detected for {domain}[/yellow]")

@@ -159,3 +159,25 @@ every field null); shopify_basic and woocommerce_promo stay 16/0/0.
   exist, so the prompt always said N/A); a line is omitted when its value is unknown; the threat
   and pricing sections (parsed into fields nothing printed) are no longer requested. The
   positioning prompt omits unknown values instead of printing "$0 - $0".
+
+## Batch 6 - change tracking and snapshot identity
+
+- `url_utils.site_identity()`: the registered domain plus the port when the URL names one.
+  `SiteIntelligence.domain`, the snapshot key, change reports and report headings use it, so
+  `127.0.0.1:8899` and `127.0.0.1:8900` (and `localhost:3000` / `localhost:3001`) keep separate
+  histories. `extract_domain()` itself is unchanged.
+- `compute_changes()` compares the scan with the newest stored snapshot *older than this scan*
+  (`get_previous_snapshot(domain, before=...)`); before, it read the second-newest row before the
+  current scan was saved, so a change was missed on the scan that saw it and reported one scan
+  later. With a previous scan and no difference it now returns an empty `ChangeReport`, so
+  report.md says "No notable change since the last scan" instead of "First scan".
+- `rate_limit_delay` in config.yaml is now honoured (it was documented in config.example.yaml and
+  read by nothing). Not in the brief; it lets the end-to-end tests run main.py without the 1.5 s
+  per-request delay. score_fixtures.py does not set it, so its wall times stay comparable.
+- robots.txt 403: unchanged; docs/observations.md notes that RFC 9309 treats 4xx as "no
+  robots.txt" (and that 5xx/network errors, which the RFC treats as "disallow all", are still
+  treated as "allowed").
+- `tests/test_change_tracking.py` runs `main.main` in-process with `--monitor`: scan 1, change the
+  hoodie price in the served copy, scan 2 reports "Highest price changed from $39.0 to $44.0",
+  scan 3 reports no change; two stores on two ports scanned twice have two histories of two scans
+  each and no spurious changes.

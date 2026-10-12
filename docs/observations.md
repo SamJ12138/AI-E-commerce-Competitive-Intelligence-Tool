@@ -135,6 +135,11 @@ from a policy page.
   "采集警告" line in report.md. The business report counts it as a competitor.
 - **robots.txt behind a bot wall means "everything allowed".** The blocked store answers 403 for
   `/robots.txt`; `_fetch_robots()` (`robots_checker.py:40-79`) treats any non-200 as "no rules".
+  *Phase 2 (Batch 6), left as is:* for 4xx this is what RFC 9309 specifies (section 2.3.1.3,
+  "Unavailable" status: a crawler MAY access any resources), so a 403 on `/robots.txt` correctly
+  means "no robots.txt". The RFC treats 5xx and network errors differently ("Unreachable":
+  assume complete disallow); the code still treats those as "allowed" too, which this note does
+  not change.
 - **Fallback chain on the blocked store** (owner decision A3; chains from the obs log):
   default run `requests(403) -> cloudscraper(403)`; `--render-js` run `browser(403, 2798 B
   rendered challenge page) -> cloudscraper(403)`. The browser engine was Playwright driving the

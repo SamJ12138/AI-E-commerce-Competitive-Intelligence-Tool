@@ -161,27 +161,27 @@ class SnapshotStore:
             return json.loads(row[0])
         return None
     
-    def get_previous_snapshot(self, domain: str) -> Optional[Dict[str, Any]]:
+    def get_previous_snapshot(self, domain: str, before: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
         """
-        Get the second most recent snapshot for a domain.
-        
-        Used for change detection against the latest scan.
-        
+        The newest stored snapshot for a site that is older than `before`
+        (default: now). Works whether or not the current scan is already saved.
+
         Args:
-            domain: Domain to look up
-            
+            domain: site identity (domain, plus port when the URL has one)
+            before: timestamp of the scan being compared
+
         Returns:
             Snapshot data as dictionary, or None if not found
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT data, scan_timestamp FROM snapshots
-            WHERE domain = ?
+            WHERE domain = ? AND scan_timestamp < ?
             ORDER BY scan_timestamp DESC
-            LIMIT 1 OFFSET 1
-        """, (domain,))
+            LIMIT 1
+        """, (domain, (before or datetime.now()).isoformat()))
         
         row = cursor.fetchone()
         conn.close()
@@ -223,17 +223,19 @@ class SnapshotStore:
         language: str = 'zh'
     ) -> Optional[ChangeReport]:
         """
-        Compute changes between current scan and previous snapshot.
-        
+        Compare the current scan with the previous scan of the same site.
+
         Args:
             current: Current SiteIntelligence object
-            previous: Previous snapshot dict (if None, will fetch from DB)
-            
+            previous: Previous snapshot dict (if None, the newest stored scan older than
+                      current.scan_timestamp)
+
         Returns:
-            ChangeReport if changes detected, None otherwise
+            None when there is nothing to compare with (first scan, or either scan blocked);
+            otherwise a ChangeReport, empty (has_changes() False) when nothing changed.
         """
         if previous is None:
-            previous = self.get_previous_snapshot(current.domain)
+            previous = self.get_previous_snapshot(current.domain, before=current.scan_timestamp)
         
         if previous is None:
             logger.info(f"No previous snapshot for {current.domain}")
@@ -312,7 +314,7 @@ class SnapshotStore:
             report.policy_changes.append(t['return_days'].format(
                 old=val(old_returns.get('return_days')), new=val(new_returns.get('return_days'))))
         
-        return report if report.has_changes() else None
+        return report
     
     def cache_page(
         self,

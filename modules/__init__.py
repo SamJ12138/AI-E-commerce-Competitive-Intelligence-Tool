@@ -13,7 +13,7 @@ from .models import (
 
 from .http_client import HttpClient
 from .robots_checker import RobotsChecker
-from .url_utils import normalize_url, extract_domain, deduplicate_urls
+from .url_utils import normalize_url, extract_domain, deduplicate_urls, site_identity
 from .platform_detector import detect_platform
 from .page_discovery import discover_pages
 from .product_extractor import extract_products, calculate_price_stats
@@ -48,7 +48,7 @@ __all__ = [
     'BusinessReportGenerator',
     
     # Functions
-    'normalize_url', 'extract_domain', 'deduplicate_urls',
+    'normalize_url', 'extract_domain', 'deduplicate_urls', 'site_identity',
     'detect_platform', 'discover_pages',
     'extract_products', 'calculate_price_stats',
     'extract_prices_from_js', 'extract_price_stats_from_html',
