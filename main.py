@@ -778,6 +778,8 @@ def analyze_site(
     
     obs.end("policies", t, free_shipping_threshold=getattr(intel.shipping_policy, 'free_shipping_threshold', None),
             return_days=getattr(intel.return_policy, 'return_days', None))
+    from urllib.parse import urlparse
+    intel.fetch_branches = dict(getattr(client, 'served_counts', {}).get(urlparse(url).netloc, {}))
     update_progress("Complete!")
     return intel
 
@@ -1125,7 +1127,10 @@ def main(
                     intel_results,
                     change_reports,
                     scan_history,
-                    "business_report"
+                    "business_report",
+                    run_info={'ignore_robots': app_config.ignore_robots, 'render_js': app_config.render_js,
+                              'ai_requested': ai, 'ai_available': ai_analyzer is not None,
+                              'ai_model': ai_model},
                 )
                 console.print(f"  📈 Business Report: {business_path}")
                 obs.event("report", "success", kind="written", files=[business_path],

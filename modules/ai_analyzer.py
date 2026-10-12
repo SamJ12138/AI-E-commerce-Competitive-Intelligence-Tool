@@ -191,58 +191,60 @@ class ChineseInsightGenerator:
             return self._fallback_insights(intel_data)
     
     def _build_prompt(self, data: Dict) -> str:
-        """Build analysis prompt from data."""
-        # Safely handle potential None values
-        announcement_text = data.get('announcement_bar_text') or '无'
-        categories = data.get('categories', [])
-        payment_methods = data.get('payment_methods', [])
-        
-        return f"""请分析以下美国电商网站的竞品情报数据：
+        """
+        Prompt from intel.to_dict(). Only fields the pipeline produces are used, and a line is
+        left out when its value is unknown (no 'N/A' placeholders). Shipping and return values
+        are read from the nested shipping_policy / return_policy.
+        """
+        ship = data.get('shipping_policy') or {}
+        ret = data.get('return_policy') or {}
+        yes_no = lambda v: None if v is None else ('是' if v else '否')
+        threshold = ship.get('free_shipping_threshold')
+        price_range = (f"${data['price_min']:g} - ${data['price_max']:g}"
+                       if data.get('price_min') is not None and data.get('price_max') is not None else None)
+        sections = [
+            ('基本信息', [
+                ('网站域名', data.get('domain')),
+                ('电商平台', data.get('platform')),
+                ('品牌名称', data.get('brand_name')),
+                ('品牌定位（页面原文）', f"“{data['brand_positioning']}”" if data.get('brand_positioning') else None),
+            ]),
+            ('产品与定价', [
+                ('产品品类', ', '.join((data.get('categories') or [])[:5]) or None),
+                ('价格区间', price_range),
+                ('中位价格', f"${data['price_median']:g}" if data.get('price_median') is not None else None),
+                ('货币', data.get('currency')),
+                ('有折扣促销', yes_no(data.get('has_discounts'))),
+            ]),
+            ('营销策略', [
+                ('公告栏内容', (data.get('announcement_bar_text') or '')[:100] or None),
+                ('有弹窗', yes_no(data.get('has_popup'))),
+                ('邮件订阅', yes_no(data.get('has_email_capture'))),
+                ('会员计划', yes_no(data.get('has_loyalty_program'))),
+                ('推荐计划', yes_no(data.get('has_referral_program'))),
+            ]),
+            ('物流与政策', [
+                ('免运费门槛', None if threshold is None else ('全场免运费' if threshold == 0 else f"${threshold:g}")),
+                ('退货天数', f"{ret['return_days']}天" if ret.get('return_days') else None),
+                ('免费退货', yes_no(ret.get('free_returns')) if ret else None),
+            ]),
+            ('信任要素', [
+                ('评论平台', data.get('review_platform')),
+                ('评论数量', data.get('total_reviews')),
+                ('支付方式', ', '.join((data.get('payment_methods') or [])[:5]) or None),
+            ]),
+        ]
+        lines = ["请分析以下美国电商网站的竞品情报数据（未列出的项目表示未采集到）：", ""]
+        for title, facts in sections:
+            present = [(label, value) for label, value in facts if value not in (None, '', [])]
+            if present:
+                lines.append(f"**{title}**")
+                lines += [f"- {label}: {value}" for label, value in present]
+                lines.append("")
+        lines += ["请提供：", "", "## 关键洞察（6-8条）", "针对这个竞品的核心竞争力和策略分析", "",
+                  "## 可复制的动作建议（3条）", "中国跨境卖家下周可以立即测试的具体行动", ""]
+        return "\n".join(lines)
 
-**基本信息**
-- 网站域名: {data.get('domain', 'Unknown')}
-- 电商平台: {data.get('platform', 'Unknown')}
-- 品牌名称: {data.get('brand_name', 'Unknown')}
-
-**产品与定价**
-- 产品品类: {', '.join(categories[:5]) if categories else '未知'}
-- 价格区间: ${data.get('price_min') or 'N/A'} - ${data.get('price_max') or 'N/A'}
-- 中位价格: ${data.get('price_median') or 'N/A'}
-- 货币: {data.get('currency', 'USD')}
-- 有折扣促销: {'是' if data.get('has_discounts') else '否'}
-
-**营销策略**
-- 公告栏内容: {announcement_text[:100] if announcement_text else '无'}
-- 有弹窗: {'是' if data.get('has_popup') else '否'}
-- 邮件订阅: {'是' if data.get('has_email_capture') else '否'}
-- 会员计划: {'是' if data.get('has_loyalty_program') else '否'}
-- 推荐计划: {'是' if data.get('has_referral_program') else '否'}
-
-**物流与政策**
-- 免运费门槛: ${data.get('free_shipping_threshold') or 'N/A'}
-- 退货天数: {data.get('return_days') or 'N/A'}天
-- 免费退货: {'是' if data.get('free_returns') else '否'}
-
-**信任要素**
-- 评论平台: {data.get('review_platform') or '无'}
-- 评论数量: {data.get('total_reviews') or 'N/A'}
-- 支付方式: {', '.join(payment_methods[:5]) if payment_methods else '未知'}
-
-请提供：
-
-## 关键洞察（6-8条）
-针对这个竞品的核心竞争力和策略分析
-
-## 可复制的动作建议（3条）
-中国跨境卖家下周可以立即测试的具体行动
-
-## 竞争威胁评估
-评分1-10，并说明理由
-
-## 定价策略建议
-基于其价格区间，给出针对性的定价建议
-"""
-    
     def _parse_response(self, response: str) -> Dict[str, List[str]]:
         """Parse LLM response into structured data."""
         result = {
@@ -330,15 +332,19 @@ class CompetitiveAnalyzer:
                          "Ollama unavailable", fallback="'AI分析不可用' string", stage="ai")
             return "AI分析不可用"
         
-        price_min = intel_data.get('price_min') or 0
-        price_max = intel_data.get('price_max') or 0
-        
+        facts = [
+            ('品牌', intel_data.get('brand_name')),
+            ('品牌定位（页面原文）', intel_data.get('brand_positioning')),
+            ('产品', ', '.join(intel_data.get('categories') or []) or None),
+            ('价格带', f"${intel_data['price_min']:.0f} - ${intel_data['price_max']:.0f}"
+             if intel_data.get('price_min') is not None and intel_data.get('price_max') is not None else None),
+            ('促销策略', intel_data.get('announcement_bar_text') or None),
+        ]
+        known = "\n".join(f"{label}: {value}" for label, value in facts if value)
+
         prompt = f"""分析这个品牌的市场定位：
 
-品牌: {intel_data.get('brand_name', 'Unknown')}
-产品: {', '.join(intel_data.get('categories', []))}
-价格带: ${price_min:.0f} - ${price_max:.0f}
-促销策略: {intel_data.get('announcement_bar_text', '无')}
+{known}
 
 请分析：
 1. 目标客户群体

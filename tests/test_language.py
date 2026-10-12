@@ -20,7 +20,7 @@ from tests.conftest import analyze_store
 CJK = re.compile(r"[　-〿㐀-鿿＀-￯]")
 WORD = re.compile(r"[A-Za-z][A-Za-z'\-]+")
 ALLOWED_NAMES = {"AI", "LLM", "Ollama", "USD", "Shopify", "WooCommerce", "BigCommerce", "Magento",
-                 "Squarespace", "Wix", "PrestaShop", "WordPress", "Custom", "Unknown", "Google", "Analytics", "Meta",
+                 "Squarespace", "Wix", "PrestaShop", "WordPress", "JavaScript", "Custom", "Unknown", "Google", "Analytics", "Meta",
                  "Pixel", "TikTok", "Pinterest", "Tag", "Snapchat", "PayPal", "Visa", "Mastercard",
                  "American", "Express", "Discover", "Klarna", "Afterpay", "Affirm", "Shop", "Pay",
                  "Apple", "Amazon", "Venmo", "Sezzle", "Yotpo", "Judge", "me", "robots", "txt", "FAQ",

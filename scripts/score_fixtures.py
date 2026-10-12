@@ -207,12 +207,17 @@ def score_run(run):
     business = out_dir / "business_report.md"
     if business.exists():
         text = business.read_text(encoding="utf-8")
-        m = re.search(r"\*\*Competitors Analyzed:\*\* (\d+)", text)
+        m = re.search(r"\*\*(?:Sites|Competitors) Analyzed:\*\* (\d+)", text)
         checks["business_competitors_analyzed"] = int(m.group(1)) if m else None
         checks["business_says_multiple_players"] = "Multiple players in similar price ranges" in text
         checks["business_says_shopify_reliance"] = "Heavy reliance on Shopify ecosystem" in text
         checks["business_claims_qwen_analysis"] = "AI-powered insight generation using Qwen2.5" in text
-        checks["business_claims_robots_respected"] = "respecting robots.txt" in text
+        checks["business_claims_robots_respected"] = ("respecting robots.txt" in text
+                                                      or "robots.txt was respected" in text)
+        checks["business_mentions_competitors"] = bool(re.search(r"competitor", text, re.I))
+        method = text.split("### Methodology", 1)[1].split("###", 1)[0] if "### Methodology" in text else ""
+        checks["business_methodology"] = " / ".join(
+            line.strip("- ").strip() for line in method.splitlines() if line.strip().startswith("- "))
     report_md = out_dir / "report.md"
     if report_md.exists():
         md = report_md.read_text(encoding="utf-8")

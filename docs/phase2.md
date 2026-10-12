@@ -131,3 +131,31 @@ Fixture scores: shopify_basic 12/1/3 -> 16/0/0, woocommerce_promo 10/1/5 -> 16/0
 
 Fixture scores: blocked 10/0/6 -> 16/0/0 and blocked_render_js 10/0/6 -> 16/0/0 (status=blocked,
 every field null); shopify_basic and woocommerce_promo stay 16/0/0.
+
+## Batch 5 - business report says only what the data supports
+
+- `business_report.py` is rewritten around the number of analysed (non-blocked) sites `n`:
+  - `n = 0`: no findings, no comparison, no recommendations; blocked sites are listed.
+  - `n = 1`: findings describe that site (platform, price range and median, how many of its
+    products are marked down, shipping offer, return window, loyalty). No market overview,
+    comparison table, averages, percentages, "competitor" or "multiple players".
+  - `n >= 2`: counts are "k of n sites"; averages are named for what they are (the average of the
+    sites' median prices); the comparison notes are computed (all on one platform, price ranges
+    overlap or not, all/none offer free shipping) instead of the fixed "Heavy reliance on Shopify
+    ecosystem" and "Multiple players in similar price ranges" sentences.
+  - Free shipping counts any threshold; before, only a threshold of exactly 0 counted, so a store
+    with free shipping over $50 was "no free shipping".
+  - Recommendations are built from the data (this site's / the sites' price ranges, thresholds,
+    return windows, loyalty) instead of fixed 0-3 / 3-6 / 6-12 month boilerplate.
+  - "Competitors Analyzed" became "Sites Analyzed".
+- Methodology states what ran: pages fetched per site and the fetch branch that served them
+  (`HttpClient.served_counts`, recorded where fetches are already logged), whether robots.txt was
+  respected or ignored, whether JavaScript rendering was used, and whether the LLM step ran (model
+  named), was requested but Ollama was unavailable, or was not requested. main.py passes these in
+  `run_info`. The evidence-level table lists levels 1-3; level 4 ("blocked by robots.txt") is never
+  produced and is no longer listed.
+- AI prompt (`ChineseInsightGenerator._build_prompt`): only fields `to_dict()` produces; shipping
+  and return values read from the nested policies (they were read from top-level keys that never
+  exist, so the prompt always said N/A); a line is omitted when its value is unknown; the threat
+  and pricing sections (parsed into fields nothing printed) are no longer requested. The
+  positioning prompt omits unknown values instead of printing "$0 - $0".

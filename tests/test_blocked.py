@@ -70,14 +70,14 @@ def test_reports_say_blocked_and_leave_it_out_of_comparisons(tmp_path, analyzed,
     assert "custom or unidentified platform" not in md   # no rule-based insights for the blocked site
 
     assert "blocked automated access" in biz
-    assert "**Competitors Analyzed:** 2" in biz
+    assert "**Sites Analyzed:** 2" in biz
     assert " of 3 " not in biz and "(33%)" not in biz and "(66%)" not in biz
 
 
 def test_only_blocked_sites(tmp_path, blocked):
     md, rows, biz = _write(tmp_path, [blocked])
     assert "blocked automated access" in md and "blocked automated access" in biz
-    assert "**Competitors Analyzed:** 0" in biz
+    assert "**Sites Analyzed:** 0" in biz
     assert "Pricing:" not in biz and "Free Shipping Gap" not in biz
 
 

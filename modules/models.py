@@ -184,6 +184,7 @@ class SiteIntelligence:
     # For anything but 'ok' every extracted field is None: the tool did not see the site.
     status: str = "ok"
     fetch_attempts: List[str] = field(default_factory=list)  # e.g. ['requests 403', 'cloudscraper 403']
+    fetch_branches: Dict[str, int] = field(default_factory=dict)  # branch -> usable responses it served
 
     # Platform detection
     platform: Optional[Platform] = Platform.CUSTOM
@@ -278,6 +279,7 @@ class SiteIntelligence:
             "scan_timestamp": self.scan_timestamp.isoformat(),
             "status": self.status,
             "fetch_attempts": self.fetch_attempts,
+            "fetch_branches": self.fetch_branches,
             "platform": self.platform.value if self.platform else None,
             "platform_confidence": self.platform_confidence,
             "platform_signals": self.platform_signals,
