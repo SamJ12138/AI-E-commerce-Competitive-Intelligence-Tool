@@ -45,7 +45,7 @@ CRAWLED_TYPES = ('collection', 'product', 'policy')
 
 
 def page_kind(url: str, page_type: str) -> Optional[str]:
-    """collection / product / shipping / returns, or None for other pages."""
+    """collection / product / shipping / returns / faq, or None for other pages."""
     if page_type in ('collection', 'product'):
         return page_type
     if page_type == 'policy':
@@ -54,6 +54,8 @@ def page_kind(url: str, page_type: str) -> Optional[str]:
             return 'shipping'
         if 'return' in path or 'refund' in path:
             return 'returns'
+        if 'faq' in path or 'help' in path:
+            return 'faq'
     return None
 
 
@@ -64,13 +66,14 @@ FIRST_PRODUCTS = 5
 
 
 def order_pages(pages: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-    """Fetch order: the first collections, shipping/returns policies, the first products, the
+    """Fetch order: the first collections, shipping/returns policies and FAQ / help pages (where
+    stores often state their shipping and returns terms), the first products, the
     remaining collections, the remaining products, other policies. Stable within each tier."""
     seen = {'collection': 0, 'product': 0}
 
     def tier(page):
         kind = page_kind(*page)
-        if kind in ('shipping', 'returns'):
+        if kind in ('shipping', 'returns', 'faq'):
             return 1
         if kind in seen:
             seen[kind] += 1

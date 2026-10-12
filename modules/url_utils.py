@@ -301,6 +301,7 @@ def categorize_page_type(url: str) -> str:
         r'/privacy',
         r'/legal',
         r'/faq',
+        r'/help',
     ]
     for pattern in policy_patterns:
         if re.search(pattern, path):

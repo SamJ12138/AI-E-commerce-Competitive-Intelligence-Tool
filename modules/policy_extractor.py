@@ -39,6 +39,10 @@ class PolicyExtractor:
         r'free\s+shipping\s+for\s+orders?\s+\$(\d+)\+',
         r'\$(\d+)\s+(or\s+more\s+)?for\s+free\s+shipping',
         r'spend\s+\$(\d+).*free\s+shipping',
+        # "Free Fast(ish) Shipping (USPS Ground, 2-5 business days) on orders $75+"
+        r'free\s+(?:[\w()\'-]+\s+){0,2}shipping\s*(?:\([^)]{0,80}\)\s*)?on\s+orders?\s+(?:over\s+|of\s+)?\$(\d+)',
+        # "If you spend over $50 USD, we'll hook you up with free shipping"
+        r'spend\s+(?:over\s+|more\s+than\s+)\$(\d+)[^.!?]{0,80}free\s+shipping',
         r'free\s+shipping\s+on\s+all\s+orders',
     ]
     

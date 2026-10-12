@@ -375,3 +375,38 @@ Measured against eight real stores (`docs/real-corpus/`, scores in `docs/real-co
   keeps the header set; recorded here only.
 - **Crawl-delay is not honoured** (louboutin: `Crawl-delay: 60`); `RobotsChecker.get_crawl_delay()`
   is still never called.
+
+## 8. Single-store misses after Phase 3 Batch 4 (filed, not chased)
+
+From `docs/real-corpus/scores-after-batch4.md`. Each occurs on one store only, or is by design.
+
+- **barefootbuttons: blocked by the tool's own headers.** nginx answers 403 to the Chrome User-Agent
+  and browser header set and 200 to an honest one (section 7). With cloudscraper off for real-site
+  runs the store ends `blocked`, `requests 403`, every field null. A3 keeps the header set.
+- **allbirds: free_returns True from the homepage JS fallback.** `extract_policies_from_homepage_js`
+  pattern 1 sets free_returns when "free shipping" and "free returns" both occur anywhere in the raw
+  homepage HTML; the returns page (now fetched) says customers pay return shipping, but it sets no
+  free_returns value, so the fallback wins.
+- **allbirds: has_loyalty True.** `\bloyalty\b` matched the privacy text ("participate in
+  promotions or loyalty programs") included in the homepage.
+- **allbirds / rastaclat: Google Pay missing.** It is declared only on product pages
+  (`<link rel="buy">`), and those runs skip product pages once 50 products come from collection
+  cards (`max_products`). By design of the cap.
+- **allbirds / deathwishcoffee: ground-truth products not reported.** Both stores reach
+  `max_products` (50) from the first collections; the colorways / mug picked for the ground truth
+  are not in that sample. The 50 reported allbirds products carry plausible prices. Sampling, not
+  extraction.
+- **brooklinen: no products.** Collection grids and product prices are rendered by JavaScript (no
+  price in the static HTML, no JSON-LD; prices only in the product JSON), and the homepage links few
+  product pages. `--render-js` was not used (default settings).
+- **brooklinen: return_days missing.** "can be returned or exchanged within 365 days" matches no
+  RETURN_DAYS_PATTERNS entry; the FAQ page (also fetched) was accepted last and has no days either.
+- **brooklinen: has_loyalty False.** The rewards page (`/pages/rewards`, linked as "My Rewards") is
+  categorised `other` and not crawled; the homepage carries no loyalty wording the patterns accept.
+- **deathwishcoffee: free_returns False where nothing is stated.** `/policies/refund-policy` matched
+  no free-return pattern and the default is False. The ground truth (from `/pages/help`) says the
+  pages read do not state who pays return shipping; the refund-policy page itself was not part of the
+  ground-truth reading, so this is recorded as a likely "silence reported as False", unverified.
+- **porterandyork: has_email_capture False.** No email field in the HTML; Klaviyo's onsite script is
+  loaded and may inject one. Ground truth is null (undeterminable from the HTML), so any definite
+  value scores as a mismatch.

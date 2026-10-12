@@ -194,3 +194,57 @@ Pay never reported. Three changes, each with a RED test on a hand-written fragme
 Rerun: payment_methods matches on brooklinen, deathwishcoffee and porterandyork; allbirds and
 rastaclat lack only Google Pay, which is declared on product pages only and those runs skip product
 pages once `max_products` is reached from the collection cards.
+
+### Fix 4 - shipping terms on FAQ / help pages (rastaclat, deathwishcoffee)
+
+After fix 3, free_shipping_threshold was missing on rastaclat (stated on `/pages/faq`) and
+deathwishcoffee (`/pages/help`). Checked offline first on the saved ground-truth pages: fetching
+those pages alone would not have helped, the threshold patterns matched neither phrasing.
+
+- `/help` paths are policy pages (`categorize_page_type`); FAQ / help pages are a page kind of their
+  own (`faq`) and share the shipping/returns tier in `order_pages()`, so a big menu does not push
+  them out of `max_pages`. (`/pages/help` was not crawled at all; `/pages/faq` was ranked last.)
+- Two free-shipping phrasings: a named service with its delivery window between "free" and
+  "on orders $N" (`Free Fast(ish) Shipping (USPS Ground Advantage, 2-5 business days) on orders $75+`)
+  and `spend over $N ... free shipping`. A shipping price alone is still not a threshold.
+- RED (`tests/test_faq_shipping.py`, hand-written sentences with the two stores' structure): 4 failed.
+  On the saved real pages the extractor now returns 75 and 50.
+
+Rerun: free_shipping_threshold matches on all 7 stores that could be read.
+
+### Batch 4 summary
+
+Real-corpus totals over 8 stores x 10 fields (status + 9 ground-truth fields), every run scored
+against the current ground truth:
+
+| run | match | partial | mismatch | missing |
+|---|---|---|---|---|
+| baseline (Batch 3) | 36 | 0 | 8 | 36 |
+| fix 1 Brotli | 54 | 6 | 6 | 14 |
+| fix 2, page-loop cap only | 54 | 6 | 6 | 14 |
+| fix 2, + page budget | 57 | 6 | 7 | 10 |
+| fix 3, Venmo flag + Elo | 57 | 6 | 7 | 10 |
+| fix 3, + product-page wallets | 57 | 5 | 8 | 10 |
+| fix 3, + no words in scripts/styles | 59 | 4 | 7 | 10 |
+| fix 4 FAQ / help pages (after Batch 4) | 62 | 4 | 6 | 8 |
+
+Per store (match / partial / mismatch / missing), baseline -> after Batch 4
+(`docs/real-corpus/scores.md` -> `docs/real-corpus/scores-after-batch4.md`):
+
+| store | before | after |
+|---|---|---|
+| allbirds | 2 / 0 / 1 / 7 | 6 / 2 / 2 / 0 |
+| barefootbuttons | 3 / 0 / 1 / 6 | 3 / 0 / 1 / 6 (blocked: 403 to the tool's headers) |
+| brooklinen | 1 / 0 / 2 / 7 | 7 / 0 / 1 / 2 |
+| deathwishcoffee | 2 / 0 / 2 / 6 | 8 / 1 / 1 / 0 |
+| louboutin | 10 / 0 / 0 / 0 | 10 / 0 / 0 / 0 (blocked as expected) |
+| pfrankmd | 10 / 0 / 0 / 0 | 10 / 0 / 0 / 0 (before: by accident, nothing was read) |
+| porterandyork | 6 / 0 / 1 / 3 | 9 / 0 / 1 / 0 |
+| rastaclat | 2 / 0 / 1 / 7 | 9 / 1 / 0 / 0 |
+
+Fixture scores stay 17/0/0 on all four runs (checked by the suite on every commit). Tests 170 ->
+238. Reruns: 7 (one per change that went through RED/GREEN, including the two that showed a fix was
+incomplete), each 8 stores with default settings and the cloudscraper branch off.
+
+What is left after Batch 4 is single-store or by design; filed in docs/observations.md section 8,
+not chased.
