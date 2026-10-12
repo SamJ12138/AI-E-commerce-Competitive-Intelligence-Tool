@@ -121,3 +121,16 @@ end of the batch.
   do not (brooklinen's homepage also links products named `rewards-...`).
 - RED: `tests/test_loyalty_link.py` 4 of 8 failed (the four non-program links are controls). On the
   saved homepages only brooklinen changes (False -> True).
+
+### barefootbuttons: account forms and menu entries are not email capture
+
+- barefootbuttons' only email fields are WooCommerce's login and register forms (`#reg_email`
+  matched `input[name*="email"]`), and its header "Newsletter" menu item links to
+  `#header-newsletter-signup`, which is not on the page (`span.header-newsletter-title` matched
+  `[class*="newsletter"]`). Fields in forms whose id, action or class names login, register,
+  account, password, checkout, search or cart no longer count, and neither does an element with no
+  field of its own that is, or sits in, a link, a button, a nav or the header. A footer newsletter
+  block without a field (Klaviyo draws the form, deathwishcoffee) still counts.
+- RED: `tests/test_email_capture.py` 4 of 8 failed, then 2 more once the fixture had barefootbuttons'
+  span inside the menu link (the first fix only skipped the `li` itself and the saved homepage still
+  matched the span). On the saved homepages only barefootbuttons changes (True -> False).

@@ -37,6 +37,10 @@ def _text_without_controls(elem) -> str:
 # offer. Matched on id and class names; <html>, <body> and <main> are never dropped.
 LEGAL_BLOCK = re.compile(r'privacy|terms|cookie|consent|gdpr', re.I)
 
+# Forms that take an email address for an account, not for marketing (matched on the form's id,
+# action and class names).
+ACCOUNT_FORM = re.compile(r'login|log-in|register|registration|account|password|checkout|search|cart', re.I)
+
 # First path segments of catalogue and blog pages: a "rewards" in them names a product or a post.
 NOT_PROGRAM_PATHS = {'products', 'product', 'collections', 'collection', 'product-category', 'shop',
                      'blogs', 'blog', 'news'}
@@ -380,31 +384,44 @@ class PromoExtractor:
         return False
     
     def _detect_email_capture(self, soup: BeautifulSoup) -> bool:
-        """Detect email capture forms."""
+        """Detect a sign-up for marketing email. Account forms (login, register, password, checkout,
+        search, cart) and menu entries without a field of their own (barefootbuttons' header
+        "Newsletter" item links to a sign-up that is not on the page) are not one."""
+        def counts(elem):
+            form = elem if elem.name == 'form' else elem.find_parent('form')
+            if form is not None and ACCOUNT_FORM.search(
+                    ' '.join([form.get('id') or '', form.get('action') or ''] + list(form.get('class') or []))):
+                return False
+            if elem.name in ('input', 'form', 'iframe') or elem.find(['input', 'form', 'iframe']):
+                return True
+            # no field of its own: a link, a button or a menu entry pointing at a sign-up elsewhere
+            return elem.name not in ('li', 'a', 'button') and elem.find_parent(['a', 'button', 'nav', 'header']) is None
+
         for selector in self.EMAIL_CAPTURE_SELECTORS:
-            if soup.select_one(selector):
-                elem = soup.select_one(selector)
+            elem = next((e for e in soup.select(selector) if counts(e)), None)
+            if elem is not None:
                 obs.note('has_email_capture', True, 'selector',
                          f"EMAIL_CAPTURE_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')} id={elem.get('id')}>")
                 return True
 
         # Check for email input fields
-        email_inputs = soup.find_all('input', {'type': 'email'})
+        email_inputs = [e for e in soup.find_all('input', {'type': 'email'}) if counts(e)]
         if email_inputs:
             obs.note('has_email_capture', True, 'selector', "input[type=email]")
             return True
 
         # Check for newsletter-related text near forms
-        forms = soup.find_all('form')
+        forms = [f for f in soup.find_all('form') if counts(f)]
         for form in forms:
             text = form.get_text().lower()
             if any(word in text for word in ['newsletter', 'subscribe', 'signup', 'join']):
                 obs.note('has_email_capture', True, 'regex', "form text contains newsletter/subscribe/signup/join")
                 return True
 
-        obs.note('has_email_capture', False, 'default', "no email capture selector, email input or form keyword")
+        obs.note('has_email_capture', False, 'default',
+                 "no email capture selector, email input or form keyword outside account forms and menu entries")
         return False
-    
+
     def _detect_loyalty(self, soup: BeautifulSoup, html_str: str) -> bool:
         """Detect a loyalty program: program wording in the text (privacy / terms / cookie blocks
         left out), or a loyalty app's signature."""
