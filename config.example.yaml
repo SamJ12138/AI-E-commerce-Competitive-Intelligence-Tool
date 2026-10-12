@@ -20,7 +20,8 @@ max_products: 50
 
 # Products taken from one collection page, so that one big collection does not fill the whole
 # sample; the homepage's product cards and products.json count as one collection each
-# (--max-per-collection).
+# (--max-per-collection). When every page is read and the sample is still under max_products, it is
+# topped up from the collection pages already fetched, in crawl order (no further request).
 max_products_per_collection: 10
 
 # Render pages in a headless browser (--render-js). Needs `playwright install chromium`.

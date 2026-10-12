@@ -680,6 +680,13 @@ def analyze_site(
 
     obs.set_page(None)
 
+    # Under the cap after every page: top up from the collection pages already read (no request).
+    if not sample.full:
+        for page_url, products in sample.top_up().items():
+            for p in products:
+                _log_product(p, page_url)
+            obs.event("products", "success", kind="product_sample_top_up", url=page_url, products=len(products))
+
     # Step 8: Process products and calculate stats
     update_progress("Processing products...")
     

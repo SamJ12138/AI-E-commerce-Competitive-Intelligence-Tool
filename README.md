@@ -66,7 +66,7 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 | `--ai-model` | The Ollama model for `--ai` (default `qwen2.5:7b`). |
 | `--monitor` | Compare each store with its previous scan and report what changed. |
 | `--max-pages`, `--max-products` | Pages read and products collected per store (defaults 20 and 50). |
-| `--max-per-collection` | Products taken from one collection page (default 10), so one big collection does not fill the sample. |
+| `--max-per-collection` | Products taken from one collection page (default 10), so one big collection does not fill the sample. When every page is read and the sample is still under `--max-products`, it is topped up from the collection pages already read. |
 | `--timeout` | Seconds to wait for one response (default 30). |
 | `--config` | A settings file; copy `config.example.yaml` to `config.yaml`, which documents every key. |
 | `--ignore-robots` | Ignore robots.txt rules and Crawl-delay. Only for sites you own or have permission to crawl. |
