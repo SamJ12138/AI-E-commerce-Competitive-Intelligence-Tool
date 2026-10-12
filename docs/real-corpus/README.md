@@ -57,6 +57,10 @@ python scripts/real_corpus.py run --out-root <dir>       # one main.py run per s
 python scripts/real_corpus.py score --out-root <dir> --md docs/real-corpus/scores.md
 ```
 
+`allbirds-scan-2026-10-12.json` records the scan behind `docs/sample/real/allbirds/` (date, price
+range, threshold, return window and the 50 sampled products with their prices) as the baseline for
+a later change-detection check; the second scan has not been run.
+
 `scores.md` is the current table; `scores-baseline.md` (before any fix),
 `scores-after-batch4.md` (pfrankmd still in the corpus) and `scores-phase4.md` (end of Phase 4) are
 kept as history.

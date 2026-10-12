@@ -252,7 +252,8 @@ free returns 7 + 1 missing, loyalty 7 + 1 mismatch, payment methods 7 + 1 partia
   re-export it; no module, script or test used any of its names. The re-export is gone too.
 - **`modules/price_extractor.py` folded and deleted** (577 lines). main.py called it only when no
   product had a price: seven methods over the homepage HTML, the first non-empty one wins. Every
-  real-store run log kept on this machine from Phases 3 to 5 (`js_price_fallback`, 90 firings)
+  real-store run log kept on this machine from Phases 3 to 5 (30 firings; this paragraph first
+  said 90, the number of log notes, three per firing)
   shows only the last method producing the range: amounts written in the homepage text. That path
   (amounts between 5 and 10000, the first 20, the page's own currency setting first) is now
   `product_extractor.homepage_price_fallback`; the six methods that never produced a range on a
@@ -267,3 +268,22 @@ free returns 7 + 1 missing, loyalty 7 + 1 mismatch, payment methods 7 + 1 partia
   still importable). GREEN: 361 passed. Fixture scores 17/0/0 on all four runs.
 - Coverage (`pytest --cov=modules --cov=main`): 76% -> 80% (statements 4794 -> 4357, missed
   1149 -> 864); product_extractor 69% -> 71%, the moved function fully covered.
+
+## Batch 5 - a real-store sample
+
+- Store: allbirds. allbirds and deathwishcoffee both score 10 of 10 after Batch 2; allbirds is used
+  because every one of its ground-truth fields is a definite value (deathwishcoffee's free returns
+  is "not stated").
+- One run, 2026-10-12 18:32 local time, `real_corpus.py run --stores allbirds` (default settings,
+  cloudscraper off), commit 72f4224: 13 pages, all served by `requests`, 27.5 s; scored 10 of 10
+  again.
+- `docs/sample/real/allbirds/`: `report.md`, `report.csv` and `business_report.md` as the run wrote
+  them, prices kept. Every quoted page text (meta description, categories, product titles) is
+  already one line per field, so nothing was trimmed. README "Output" links it next to the fixture
+  sample, with the date and "one scan of a public storefront".
+- `docs/real-corpus/allbirds-scan-2026-10-12.json`: the baseline for a later change-detection check
+  (scan time, run id, commit, price range $14-$145 with median $105, threshold $100, 30-day returns,
+  categories, featured products, and the 50 sampled products by URL path with price and
+  compare-at). The second scan is not run.
+- Read in the sample and filed (observations section 12): run-together product titles, a shipping
+  delay read as a delivery window, and the returns page labelled "product/cart".

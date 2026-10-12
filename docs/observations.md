@@ -496,3 +496,18 @@ deathwishcoffee's free returns; porterandyork's email capture.
   compare-at price).
 - **Not scored: has_popup is True on all seven saved homepages.** Popups are not in the ground
   truth; this was noticed while checking promo fields offline and not investigated.
+
+## 12. Phase 5 Batch 5: read in the real-store sample (filed, not chased)
+
+From `docs/sample/real/allbirds/` (one scan, 2026-10-12, 10 of 10 on the corpus fields).
+
+- **Product titles run colour and price together** ("Men's Dasher NZNatural Black$140"): allbirds'
+  card title comes from the product link's whole text, which also holds the colour and price
+  spans. The scored fields (price, compare-at by URL) are right; the featured-product list in
+  `report.md` shows the run-together title.
+- **"Delivery time: about 30-30 days"** comes from the shipping banner "orders may take up to 30
+  days to ship", a processing delay, read as a delivery window.
+- **The returns page is labelled "Product/cart page, manual check needed"** in "Policy Data
+  Sources": `/pages/returns-exchanges` is neither `/policies/` nor FAQ/help, so it gets evidence
+  level 3, whose label is "product/cart". The value (30 days, customer pays return shipping) is
+  right.

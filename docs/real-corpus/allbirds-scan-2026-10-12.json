@@ -1,0 +1,350 @@
+{
+ "store": "allbirds",
+ "url": "https://www.allbirds.com",
+ "scanned_at": "2026-10-12T18:32:32.849731",
+ "run_id": "allbirds-20261012T183231",
+ "tool_commit": "72f4224",
+ "settings": "default (python scripts/real_corpus.py run --stores allbirds), cloudscraper off",
+ "purpose": "baseline for a later change-detection check: scan the store again and compare; the second scan has not been run",
+ "price_min": 14.0,
+ "price_max": 145.0,
+ "price_median": 105.0,
+ "currency": "USD",
+ "has_discounts": true,
+ "product_sample": {
+  "products": 50,
+  "collections": 5,
+  "per_collection": 10,
+  "homepage": 0,
+  "product_pages": 3,
+  "feed": 0
+ },
+ "free_shipping_threshold": 100.0,
+ "return_days": 30,
+ "free_returns": false,
+ "announcement_bar_text": "",
+ "categories": [
+  "New Arrivals",
+  "All",
+  "Bestsellers",
+  "LEATHER ALTERNATIVES",
+  "Men's Shoes",
+  "Sneakers",
+  "Slip Ons",
+  "Sandals",
+  "Active",
+  "All-Weather",
+  "Runner NZ",
+  "Cruiser",
+  "Tree Runner NZ",
+  "Socks",
+  "Men's Apparel"
+ ],
+ "hero_products": [
+  "Men's Dasher NZNatural Black$140",
+  "Men's Dasher NZAnthracite$140",
+  "Women's Tree Runner NZMedium Grey$100"
+ ],
+ "products": [
+  {
+   "path": "/products/mens-dasher-nz-natural-black-blizzard",
+   "title": "Men's Dasher NZNatural Black$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-anthracite",
+   "title": "Men's Dasher NZAnthracite$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-tree-runner-nz-medium-grey",
+   "title": "Women's Tree Runner NZMedium Grey$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-terralux-anthracite",
+   "title": "Men's Cruiser TerraluxAnthracite$135",
+   "price": 135.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-wool-runner-nz-natural-black",
+   "title": "Women's Wool Runner NZNatural Black$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-dark-eucalyptus",
+   "title": "Men's Dasher NZDark Eucalyptus$99$140",
+   "price": 99.0,
+   "compare_at": 140.0
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-blizzard-dark-navy",
+   "title": "Men's Tree Runner NZBlizzard/Dark Navy$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-mushroom",
+   "title": "Men's Tree Runner NZMushroom$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-tree-breezers",
+   "title": "Women's Tree BreezerNavy Night$105",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-tree-breezers-mist",
+   "title": "Women's Tree BreezerMist$105",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/anytime-no-show-heel-grip",
+   "title": "Anytime No Show Heel Grip SockBlizzard$14",
+   "price": 14.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-medium-grey",
+   "title": "Men's Tree Runner NZMedium Grey$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-natural-black",
+   "title": "Men's Tree Runner NZNatural Black$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-wool-runners",
+   "title": "Men's Wool RunnerNatural Grey$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-natural-black-blizzard",
+   "title": "Men's Tree Runner NZNatural Black$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-dark-navy",
+   "title": "Men's CruiserDark Navy$105",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-wool-cruiser-natural-grey",
+   "title": "Women's Wool CruiserNatural Grey$105",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-tree-runner-nz-blizzard-dark-navy",
+   "title": "Women's Tree Runner NZBlizzard/Dark Navy$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-wool-cruiser",
+   "title": "Men's Wool CruiserNatural Grey$105",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-wool-runner-nz-dark-navy",
+   "title": "Men's Wool Runner NZDark Navy$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-slip-on-mushroom",
+   "title": "Men's Runner NZ Slip On",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-medium-grey",
+   "title": "Men's Cruiser",
+   "price": 105.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/womens-cruiser-canvas-port",
+   "title": "Women's Canvas Cruiser",
+   "price": 75.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-canvas-burnt-olive",
+   "title": "Men's Canvas CruiserBurnt Olive$75",
+   "price": 75.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity",
+   "title": "Men's VarsityParchment$120",
+   "price": 120.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-jersey",
+   "title": "Men's Varsity JerseyLight Grey/Anthracite$130",
+   "price": 130.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-slip-on-burnt-olive",
+   "title": "Men's Cruiser Slip OnBurnt Olive$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-jersey-light-grey-syrah",
+   "title": "Men's Varsity JerseyLight Grey/Syrah$130",
+   "price": 130.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-jersey-light-grey-verdant-green",
+   "title": "Men's Varsity JerseyLight Grey/Verdant Green$130",
+   "price": 130.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-canvas-runner-nz",
+   "title": "Men's Canvas Runner NZDeep Navy Stripes$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-jersey",
+   "title": "Men's Runner NZ JerseyLight Grey/Anthracite$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-jersey-light-grey-syrah",
+   "title": "Men's Runner NZ JerseyLight Grey/Syrah$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-jersey-light-grey-verdant-green",
+   "title": "Men's Runner NZ JerseyLight Grey/Verdant Green$110",
+   "price": 110.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-light-burnt-olive",
+   "title": "Men's Dasher NZLight Burnt Olive$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-blizzard",
+   "title": "Men's Dasher NZBlizzard$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-medium-grey",
+   "title": "Men's Dasher NZMedium Grey$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-dasher-nz-natural-black",
+   "title": "Men's Dasher NZNatural Black$140",
+   "price": 140.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-natural-white",
+   "title": "Men's Tree Runner NZNatural White$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-rugged-beige",
+   "title": "Men's Tree Runner NZRugged Beige$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz",
+   "title": "Men's Tree Runner NZBlizzard$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-ochre",
+   "title": "Men's Tree Runner NZOchre$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-blizzard-verdant-green",
+   "title": "Men's Tree Runner NZBlizzard/Verdant Green$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-tree-runner-nz-burnt-olive",
+   "title": "Men's Tree Runner NZBurnt Olive$100",
+   "price": 100.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-terralux",
+   "title": "Men's Cruiser TerraluxToasted Coconut$135",
+   "price": 135.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-cruiser-terralux-light-grey",
+   "title": "Men's Cruiser TerraluxLight Grey$135",
+   "price": 135.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-terralux",
+   "title": "Men's Runner NZ TerraluxAnthracite$135",
+   "price": 135.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-runner-nz-terralux-toasted-coconut",
+   "title": "Men's Runner NZ TerraluxToasted Coconut$135",
+   "price": 135.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-terralux",
+   "title": "Men's Varsity TerraluxAnthracite$145",
+   "price": 145.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-terralux-toasted-coconut",
+   "title": "Men's Varsity TerraluxToasted Coconut$145",
+   "price": 145.0,
+   "compare_at": null
+  },
+  {
+   "path": "/products/mens-varsity-terralux-light-grey",
+   "title": "Men's Varsity TerraluxLight Grey$145",
+   "price": 145.0,
+   "compare_at": null
+  }
+ ]
+}

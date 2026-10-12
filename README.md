@@ -181,7 +181,12 @@ platforms, price ranges, shipping and return terms, a feature matrix, what the d
 what to compare against, and how the data was collected.
 
 Reports produced by `scripts/demo.py` from the fixture stores: [docs/sample/](docs/sample/report.md)
-(English) and [docs/sample/zh/](docs/sample/zh/report.md) (Chinese).
+(English) and [docs/sample/zh/](docs/sample/zh/report.md) (Chinese). Reports from a real store:
+[docs/sample/real/allbirds/](docs/sample/real/allbirds/report.md), one scan of a public storefront
+(allbirds.com on 2026-10-12, default settings), with the prices it showed that day. It is the
+corpus store that scored 10 of 10 (tied with deathwishcoffee, whose free-returns value is "not
+stated"); the reports are the tool's output as it was, including its rough edges (product titles
+that run colour and price together, see [docs/observations.md](docs/observations.md) section 12).
 
 ## What "AI" means here
 
