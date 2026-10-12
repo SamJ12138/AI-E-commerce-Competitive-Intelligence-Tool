@@ -151,3 +151,40 @@ Six with default settings, brooklinen with `--render-js` as its scored run (same
   kept, with the unknowns stated: the old one said True on all seven, from a cart, menu, quick-buy,
   added-to-cart or disabled element on five, the bare word "klaviyo" on porterandyork, and (by its
   `.modal` selector) the right element only on brooklinen.
+
+## 4. beardbrand: cards that are the product link
+
+- Observations section 11: beardbrand's collection pages gave one product each. Each card is
+  `<a class="product-item" href="/products/...">` with `span.title` and `span.price` ("From $32")
+  inside, in a `div.site-box-container[data-handle]` collection wrapper. `.product-item` already
+  matched the cards, but the card parser looked for the product link among the card's descendants
+  only, so every card was dropped (no URL). The wrapper, matched by `[data-handle]`, became one
+  product: the collection heading as its title ("Beard Oil"), the first card's link and price.
+- The card's own link now counts (`_card_links`: the element itself when it is an `<a href>`, then
+  its links), for the URL and the link-text title fallback. A matched element that links to more
+  than one product is a wrapper, not a card, and is skipped.
+- Fixture (`tests/test_link_cards.py`, hand-written from the saved collection page's structure):
+  five link cards in a `[data-handle]` wrapper with a "Beard Oil" heading, a rating badge and a
+  "Sold out" badge in each card. RED: 2 of 3 failed (one product, "Beard Oil", $32; the third case,
+  a Dawn-style card with the link inside, is the control). GREEN: 394 passed.
+- On the saved pages (no new fetch), current code vs the code before this change: of the 63
+  ground-truth pages of the seven stores, only beardbrand's `/collections/beard-oil` changes (1 -> 5
+  products, the right titles and prices); the 12 rendered brooklinen pages of item 3's run give the
+  same products.
+
+### beardbrand (one run, 2026-10-12)
+
+| | pages | sample | price range | has_discounts | products (of 4) |
+|---|---|---|---|---|---|
+| item 3's run | 20 | 14 from 9 collections (one each) and 5 product pages | $12-$124.9535 | False | 2 (Black Sails, Old Money Beard Oil missing) |
+| after | 18 | 50 from 8 collections and 4 product pages | $24-$124.9535 | True | 4 |
+
+- 18 pages instead of 20: the sample reached 50, so two collection pages were skipped.
+- has_discounts True: "Dented Temple Smoke Utility Beard Wash" is $25 with a compare-at $36 on its
+  collection card (a real markdown; the ground truth's four products have none).
+- beardbrand scores 10/0/1/0 (was 9/1/1/0). The miss is has_loyalty (the Alliance membership,
+  observations section 11, filed).
+- Found in this run, not fixed (observations section 13): the price written as 124.9535. The
+  Utility Beard Trimmer's product-page price block reads "$124.95" and "35 reviews" as one string
+  ("$124.9535 reviews"). It was the same in item 3's run; the scorer's tolerance counts it as the
+  ground truth's $124.95.

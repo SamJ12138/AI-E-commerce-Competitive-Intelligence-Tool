@@ -220,11 +220,25 @@ class ProductExtractor:
         )
         
         for card in product_cards:
+            if self._links_several_products(card):
+                continue  # a collection wrapper (beardbrand's div[data-handle]), not one product's card
             product = self._parse_product_card(card, url)
             if product:
                 products.append(product)
-        
+
         return products
+
+    @staticmethod
+    def _card_links(element) -> List:
+        """The element's links, the element itself first when the whole card is a link
+        (beardbrand: <a class="product-item" href="/products/...">)."""
+        own = [element] if element.name == 'a' and element.get('href') else []
+        return own + element.find_all('a', href=True)
+
+    @classmethod
+    def _links_several_products(cls, element) -> bool:
+        handles = {product_key(a['href']) for a in cls._card_links(element) if '/products/' in a.get('href', '')}
+        return len(handles) > 1
     
     PRODUCT_TITLE_SELECTORS = ['h1.product_title', 'h1.product__title', '.product__title h1',
                                '.product-single__title', 'h1[itemprop="name"]', 'main h1', 'h1']
@@ -568,7 +582,7 @@ class ProductExtractor:
             
             if not title:
                 # Try any link text that looks like a product title
-                links = element.find_all('a', href=True)
+                links = self._card_links(element)
                 for link in links:
                     href = link.get('href', '')
                     # Check if link goes to a product page
@@ -588,7 +602,7 @@ class ProductExtractor:
             
             # Find URL - look for product links specifically
             product_url = None
-            links = element.find_all('a', href=True)
+            links = self._card_links(element)
             for link in links:
                 href = link.get('href', '')
                 if '/products/' in href:
@@ -597,7 +611,7 @@ class ProductExtractor:
             
             # Fallback to first link if no product link found
             if not product_url:
-                link = element.find('a', href=True)
+                link = next(iter(links), None)
                 if link:
                     product_url = make_absolute_url(base_url, link['href'])
             
