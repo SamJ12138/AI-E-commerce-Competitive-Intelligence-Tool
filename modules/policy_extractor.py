@@ -204,25 +204,54 @@ class PolicyExtractor:
         obs.note('return_days', None, 'default', "no RETURN_DAYS_PATTERNS matched on this page")
         return None
     
-    def _check_free_returns(self, text: str) -> bool:
-        """Check if returns are free."""
-        free_return_patterns = [
-            r'free\s+returns?',
-            r'returns?\s+are\s+free',
-            r'no\s+cost\s+returns?',
-            r'complimentary\s+returns?',
-            r'we\s+cover\s+return\s+shipping',
-        ]
-        
-        for pattern in free_return_patterns:
-            if re.search(pattern, text, re.IGNORECASE):
-                obs.note('free_returns', True, 'regex',
-                         f"free_return_patterns {pattern!r} matched {re.search(pattern, text, re.IGNORECASE).group(0)!r}")
-                return True
+    # Returns are free: "free returns" (not "pain-free returns"), a complimentary label, ...
+    FREE_RETURN_PATTERNS = [
+        r'(?<![\w-])free\s+returns?',
+        r'returns?\s+are\s+(?:always\s+)?free',
+        r'no[\s-]+cost\s+returns?',
+        r'complimentary\s+returns?',
+        r'complimentary\s+return\s+(?:label|shipping)',
+        r'free\s+return\s+(?:label|shipping)',
+        r'we\s+(?:cover|pay\s+for)\s+(?:the\s+)?return\s+shipping',
+    ]
+    # The customer pays, or returns are not accepted. Checked per sentence; the first pattern needs
+    # the sentence to be about a return as well ("responsible for shipping costs" alone is not).
+    PAID_RETURN_PATTERNS = [
+        r'\bresponsible\s+for\b[^.]{0,80}\b(?:shipping|postage|label)\b',
+        r'\breturn\s+(?:shipping\s+)?fee\b',
+        r'\brestocking\s+fee\b',
+        r"\b(?:cannot|can't|can\s+not|do\s+not|don't|does\s+not|will\s+not|won't)\s+accept\s+return",
+        r'\breturn\s+shipping\s+(?:costs?|charges?|fees?)\s+(?:are|is|will\s+be)\s+deducted',
+    ]
 
-        obs.note('free_returns', False, 'default', "no free_return_patterns matched on this page")
-        return False
-    
+    def _check_free_returns(self, text: str) -> Optional[bool]:
+        """True: the page says returns are free. False: it says the customer pays for them, or that
+        returns are not accepted. None: it says neither, or both (silence is not "not free")."""
+        free = next(((p, m) for p in self.FREE_RETURN_PATTERNS for m in [re.search(p, text, re.IGNORECASE)] if m),
+                    None)
+        paid = None
+        for sentence in re.split(r'(?<=[.!?])\s+', text):
+            for i, pattern in enumerate(self.PAID_RETURN_PATTERNS):
+                m = re.search(pattern, sentence, re.IGNORECASE)
+                if m and (i != 0 or re.search(r'\breturn', sentence, re.IGNORECASE)):
+                    paid = (pattern, m)
+                    break
+            if paid:
+                break
+
+        if free and paid:
+            obs.note('free_returns', None, 'default',
+                     f"both free ({free[1].group(0)!r}) and paid ({paid[1].group(0)!r}) return wording on this page")
+            return None
+        if free:
+            obs.note('free_returns', True, 'regex', f"FREE_RETURN_PATTERNS {free[0]!r} matched {free[1].group(0)!r}")
+            return True
+        if paid:
+            obs.note('free_returns', False, 'regex', f"PAID_RETURN_PATTERNS {paid[0]!r} matched {paid[1].group(0)!r}")
+            return False
+        obs.note('free_returns', None, 'default', "no free or paid return wording on this page")
+        return None
+
     def _extract_return_conditions(self, text: str) -> List[str]:
         """Extract return conditions."""
         conditions = []

@@ -655,7 +655,10 @@ def analyze_site(
                           threshold=shipping.free_shipping_threshold,
                           reason="a policy is already set and this page has no threshold")
 
+            known = intel.return_policy.free_returns if intel.return_policy else None
             if returns and (not intel.return_policy or returns.return_days is not None):
+                if returns.free_returns is None and known is not None:
+                    returns.free_returns = known  # this page says nothing about return costs
                 returns.evidence_level = evidence_level
                 returns.evidence_source = evidence_source
                 returns.evidence_url = page_url
@@ -670,6 +673,11 @@ def analyze_site(
             elif returns:
                 obs.event("policies", "skip", kind="return_policy_ignored", url=page_url,
                           return_days=returns.return_days, reason="a policy is already set and this page has no days")
+                if known is None and returns.free_returns is not None:
+                    intel.return_policy.free_returns = returns.free_returns
+                    obs.apply('free_returns', returns.free_returns,
+                              f"return costs stated on {page_url}; the accepted policy page did not say",
+                              stage="policies")
 
     obs.set_page(None)
 
@@ -777,7 +785,8 @@ def analyze_site(
                 obs.apply('return_days', js_policies['return_days'], "homepage JS fallback applied",
                           stage="policies")
         
-        if js_policies.get('free_returns'):
+        # Only where no policy page said anything about return costs
+        if js_policies.get('free_returns') and getattr(intel.return_policy, 'free_returns', None) is None:
             if not intel.return_policy:
                 from modules.models import ReturnPolicy
                 intel.return_policy = ReturnPolicy()

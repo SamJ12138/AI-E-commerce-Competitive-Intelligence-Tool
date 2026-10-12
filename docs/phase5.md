@@ -75,3 +75,26 @@ end of the batch.
 - RED: `tests/test_promo_legal_text.py` 3 of 4 failed (loyalty / referral True from a privacy modal,
   terms text and a cookie banner; the fourth is the control). On the seven saved homepages only
   allbirds changes (loyalty and referral True -> False).
+
+### deathwishcoffee, barefootbuttons, allbirds, beardbrand: free returns only when stated
+
+- `free_returns` has three values now: True when a page says returns are free, False when it says
+  the customer pays (responsible for return shipping / the label, a return or restocking fee, a
+  return-shipping deduction) or that returns are not accepted, None when it says neither or both.
+  Before, a page with no free-return wording gave False, so silence read as "not free"
+  (deathwishcoffee, barefootbuttons). "Pain-free returns" no longer counts as "free returns".
+  `ReturnPolicy.free_returns` defaults to None; the CSV cell is then empty, and the reports print
+  "free" only for True, as before.
+- Pages are merged: an accepted return policy page that says nothing about return costs keeps the
+  value an earlier page stated, and a page that is not accepted (no return window) fills the value
+  when the accepted page did not say (beardbrand: the returns page has the window, the FAQ has
+  "a complimentary return label").
+- The homepage fallback ("free shipping" and "free returns" anywhere in the homepage HTML) applies
+  only when no policy page said anything about return costs (allbirds: the returns page says
+  "Customers are responsible for return shipping charges", the fallback set True over it).
+- RED: `tests/test_free_returns.py` 9 of 17 failed (silence, "pain-free", mixed and
+  not-about-returns wording gave False; the page merge and the fallback guard). The five
+  paid-wording cases passed before only because silence was already False.
+- On the saved policy pages: allbirds, brooklinen, rastaclat and porterandyork False,
+  deathwishcoffee None, beardbrand None on the returns page and True on the FAQ: the ground truth
+  for all six.

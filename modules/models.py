@@ -104,7 +104,7 @@ class ShippingPolicy:
 class ReturnPolicy:
     """Return policy information with evidence source tracking."""
     return_days: Optional[int] = None
-    free_returns: bool = False
+    free_returns: Optional[bool] = None  # None: the pages do not say
     conditions: List[str] = field(default_factory=list)
     exclusions: List[str] = field(default_factory=list)
     raw_text: str = ""
