@@ -38,6 +38,7 @@
     "has_popup": false,
     "has_loyalty": false,
     "has_referral": false,
-    "pixels": []
+    "pixels": [],
+    "announcement_bar": "Free shipping on orders over $50"
   }
 }

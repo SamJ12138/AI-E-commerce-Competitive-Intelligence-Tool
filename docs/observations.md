@@ -139,7 +139,8 @@ from a policy page.
   "Unavailable" status: a crawler MAY access any resources), so a 403 on `/robots.txt` correctly
   means "no robots.txt". The RFC treats 5xx and network errors differently ("Unreachable":
   assume complete disallow); the code still treats those as "allowed" too, which this note does
-  not change.
+  not change. *Phase 3 Batch 2:* fixed; 5xx / timeout / no answer now disallow the whole host for
+  the run.
 - **Fallback chain on the blocked store** (owner decision A3; chains from the obs log):
   default run `requests(403) -> cloudscraper(403)`; `--render-js` run `browser(403, 2798 B
   rendered challenge page) -> cloudscraper(403)`. The browser engine was Playwright driving the
@@ -169,7 +170,8 @@ from a policy page.
   `compare_at_price` when it is numeric (`:312`), but computes `is_on_sale` by comparing the
   strings (`:313`). Numeric prices over 100 are treated as cents and divided by 100 (`:306`), so a
   numeric price of 150 dollars becomes 1.50 while 99 cents stays 99. Read from code; our fixture
-  does not serve `/products.json`.
+  does not serve `/products.json`. *Phase 3 Batch 2:* `/products.json` is now requested only when
+  the homepage links a JSON product endpoint (`main.products_json_linked`).
 - **429 handling is unreachable.** urllib3 `Retry(status_forcelist=[429, 500, ...])`
   (`http_client.py:163`) retries and then raises, so the `status_code == 429` branch (`:479`) never
   runs; the result is `Request error: ...`.

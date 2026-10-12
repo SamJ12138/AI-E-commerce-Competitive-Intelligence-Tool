@@ -34,6 +34,7 @@
     "has_popup": null,
     "has_loyalty": null,
     "has_referral": null,
-    "pixels": null
+    "pixels": null,
+    "announcement_bar": null
   }
 }

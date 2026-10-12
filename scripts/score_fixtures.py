@@ -66,6 +66,7 @@ FIELDS = [
     ("has_loyalty", "has_loyalty", "has_loyalty", "bool"),
     ("has_referral", "has_referral", "has_referral", "bool"),
     ("pixels", "pixels_detected", "pixels_detected", "set"),
+    ("announcement_bar", "announcement_bar", "announcement_bar", "text"),
 ]
 
 CARD_BRANDS = {"Visa", "Mastercard", "American Express", "Discover"}

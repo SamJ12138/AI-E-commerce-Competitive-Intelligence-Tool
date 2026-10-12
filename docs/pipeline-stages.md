@@ -63,7 +63,9 @@ one `fetch` event (url, status, `served_by`, bytes, branch chain, rate-limit wai
   - robots.txt is fetched with a bare `requests.get` (no rate limit, no retry, timeout 10 s), not
     through `HttpClient`.
   - Any non-200 answer (404, 403 from a bot wall, 5xx) or exception => every URL is treated as
-    allowed (`robots` fail/degraded, `treat every URL as allowed`).
+    allowed (`robots` fail/degraded, `treat every URL as allowed`). *Phase 3 Batch 2:* only 4xx
+    now means "allowed"; 5xx, a timeout or no answer disallow every URL of that host for the run
+    (RFC 9309 2.3.1.4), and main.py names the reason when it skips the site.
   - `--ignore-robots` short-circuits `is_allowed()` to `True`.
   - Rules are evaluated for user agent `*`, not the tool's UA; `Crawl-delay` is parsed by
     `get_crawl_delay()` (:142) but nothing calls it.
@@ -105,7 +107,8 @@ one `fetch` event (url, status, `served_by`, bytes, branch chain, rate-limit wai
 ### platform
 - **Owner:** `detect_platform()` modules/platform_detector.py:279 -> `PlatformDetector.detect()` :169.
 - **Input:** homepage soup, response headers (from a **second** fetch of the homepage, main.py:493:
-  one extra request and 1.5 s per site), URL.
+  one extra request and 1.5 s per site; *Phase 3 Batch 2:* read from the one homepage fetch via
+  `HttpClient.last_headers`), URL.
 - **Output:** `Platform`, confidence (0.6/0.8/0.95 by signal count), signal list.
 - **Failure modes:** substring regexes over the whole HTML (`"Shopify"`, `woocommerce`, `Magento`,
   `requirejs`) can fire on text that merely mentions a platform; ties go to the earlier `Platform`

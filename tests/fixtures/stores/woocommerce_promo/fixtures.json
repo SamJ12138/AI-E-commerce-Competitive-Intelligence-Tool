@@ -41,6 +41,7 @@
     "has_popup": false,
     "has_loyalty": true,
     "has_referral": false,
-    "pixels": ["Google Analytics"]
+    "pixels": ["Google Analytics"],
+    "announcement_bar": "Summer Sale: 20% off everything, applied automatically. Free shipping on orders over $75."
   }
 }

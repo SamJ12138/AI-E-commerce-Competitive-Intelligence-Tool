@@ -23,8 +23,10 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, NamedTuple, Optional, Tuple
+from urllib.parse import urljoin, urlparse
 
 import click
+from bs4 import BeautifulSoup
 import yaml
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
@@ -357,6 +359,7 @@ def analyze_site(
     obs.set_page(url)
     t = obs.begin("fetch_homepage", url=url)
     soup, status, error = client.fetch_and_parse(url)
+    homepage_headers = dict(getattr(client, 'last_headers', None) or {})
 
     if error:
         obs.event("fetch_homepage", "fail", duration_ms=t.ms(), error_type=obs.classify_fetch(status, error),
@@ -377,9 +380,8 @@ def analyze_site(
 
     # Step 2: Detect platform
     update_progress("Detecting platform...")
-    t = obs.begin("platform", note="homepage fetched a second time only to read response headers")
-    html_content, _, headers, _ = client.fetch(url)
-    platform, confidence, signals = detect_platform(soup, headers or {}, url)
+    t = obs.begin("platform")
+    platform, confidence, signals = detect_platform(soup, homepage_headers, url)
     intel.platform = platform
     intel.platform_confidence = confidence
     intel.platform_signals = signals
@@ -523,10 +525,12 @@ def analyze_site(
     all_products = []
     t_products = obs.begin("products")
     
-    # For Shopify sites, try the /products.json API (every product with its compare-at price)
-    if intel.platform == Platform.SHOPIFY:
-        from urllib.parse import urljoin
-        
+    # For Shopify sites, try the /products.json API (every product with its compare-at price),
+    # but only when the homepage links a JSON product endpoint; a guess is a likely 404.
+    if intel.platform == Platform.SHOPIFY and not products_json_linked(soup, url):
+        obs.skip("products", "Shopify, but the homepage links no JSON product endpoint: /products.json not requested",
+                 url=urljoin(url, '/products.json'))
+    elif intel.platform == Platform.SHOPIFY:
         # Try to fetch products.json API endpoint
         products_json_url = urljoin(url, '/products.json')
         update_progress("Fetching Shopify products API...")
@@ -767,10 +771,26 @@ def analyze_site(
     
     obs.end("policies", t, free_shipping_threshold=getattr(intel.shipping_policy, 'free_shipping_threshold', None),
             return_days=getattr(intel.return_policy, 'return_days', None))
-    from urllib.parse import urlparse
     intel.fetch_branches = dict(getattr(client, 'served_counts', {}).get(urlparse(url).netloc, {}))
     update_progress("Complete!")
     return intel
+
+
+PRODUCT_JSON_PATH = re.compile(r'^/(?:collections/[^/]+/)?products(?:\.json|/[^/]+\.(?:json|js|oembed))$')
+
+
+def products_json_linked(soup: BeautifulSoup, url: str) -> bool:
+    """True when an attribute on the homepage points at a same-host Shopify JSON product endpoint
+    (/products.json, /collections/<c>/products.json, /products/<handle>.json|.js|.oembed)."""
+    host = urlparse(url).netloc.lower().removeprefix('www.')
+    for tag in soup.find_all(True):
+        for value in tag.attrs.values():
+            if not isinstance(value, str) or 'products' not in value:
+                continue
+            target = urlparse(urljoin(url, value.strip()))
+            if target.netloc.lower().removeprefix('www.') == host and PRODUCT_JSON_PATH.match(target.path):
+                return True
+    return False
 
 
 def _mark_not_seen(intel: SiteIntelligence, chain: list, reason: str) -> None:
@@ -998,9 +1018,11 @@ def main(
                     obs.skip("robots", "--ignore-robots / ignore_robots: robots.txt not consulted")
                 t = obs.begin("robots", url=url)
                 if not app_config.ignore_robots and not robots_checker.is_allowed(url):
-                    obs.skip("robots", "robots.txt disallows the homepage; site skipped", url=url)
-                    obs.event("site", "skip", duration_ms=t_site.ms(), error_message="robots.txt disallow")
-                    console.print(f"[yellow]Skipping {domain} - blocked by robots.txt[/yellow]")
+                    why = robots_checker.unreachable_reason(url)
+                    reason = f"{why}: RFC 9309 says disallow all" if why else "robots.txt disallows the homepage"
+                    obs.skip("robots", f"{reason}; site skipped", url=url)
+                    obs.event("site", "skip", duration_ms=t_site.ms(), error_message=reason)
+                    console.print(f"[yellow]Skipping {domain} - {reason}[/yellow]")
                     progress.advance(main_task)
                     continue
                 obs.end("robots", t, url=url, allowed=True)

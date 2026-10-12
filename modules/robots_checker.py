@@ -31,53 +31,88 @@ class RobotsChecker:
         self.cache: Dict[str, Optional[RobotExclusionRulesParser]] = {}
         self.user_agent = config.user_agent
         self.blocked_urls: List[str] = []  # Track blocked URLs for evidence
-    
+        self.unreachable: Dict[str, str] = {}  # netloc -> why robots.txt could not be read
+
     def _get_robots_url(self, url: str) -> str:
         """Get the robots.txt URL for a given URL."""
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     
     def _fetch_robots(self, url: str) -> Optional[RobotExclusionRulesParser]:
-        """Fetch and parse robots.txt for a domain."""
+        """Fetch and parse robots.txt for a domain (RFC 9309, section 2.3.1).
+
+        2xx: the rules apply. 4xx ("unavailable"): no robots.txt, every URL is allowed.
+        5xx or no answer at all ("unreachable"): every URL is disallowed for this run.
+        """
         robots_url = self._get_robots_url(url)
+        domain = urlparse(url).netloc
+        timeout = min(10, self.config.timeout)
         timer = obs.Timer()
 
         try:
             response = requests.get(
                 robots_url,
-                timeout=10,
+                timeout=timeout,
                 headers={"User-Agent": self.user_agent}
             )
-            obs.event("robots", "success" if response.status_code == 200 else "fail",
-                      duration_ms=timer.ms(),
-                      error_type=None if response.status_code == 200 else obs.classify_fetch(
-                          response.status_code, f"robots.txt status {response.status_code}"),
-                      error_message=None if response.status_code == 200 else f"robots.txt status {response.status_code}",
-                      kind="robots_fetch", url=robots_url, status=response.status_code,
-                      served_by="requests(direct, no rate limit, no cloudscraper)",
-                      bytes=len(response.content or b""))
-
-            if response.status_code == 200:
-                parser = RobotExclusionRulesParser()
-                parser.parse(response.text)
-                logger.debug(f"Loaded robots.txt from {robots_url}")
-                return parser
-            else:
-                # No robots.txt or error - assume allowed
-                obs.degraded("robots_checker.py:_fetch_robots",
-                             obs.classify_fetch(response.status_code, f"status {response.status_code}") or "http",
-                             f"robots.txt answered {response.status_code}", fallback="treat every URL as allowed",
-                             stage="robots", url=robots_url)
-                logger.debug(f"No robots.txt at {robots_url} (status {response.status_code})")
-                return None
-
-        except Exception as e:
-            obs.swallowed("robots_checker.py:_fetch_robots", fallback="treat every URL as allowed",
+        except requests.exceptions.TooManyRedirects:
+            # RFC 9309 2.3.1.2: more than five redirects MAY be treated as unavailable.
+            obs.swallowed("robots_checker.py:_fetch_robots", error_type="http",
+                          fallback="treat every URL as allowed (too many redirects = unavailable)",
                           stage="robots", url=robots_url)
-            # Only log at debug level - SSL errors are common and not critical
-            logger.debug(f"Could not fetch robots.txt from {robots_url}: {e}")
             return None
-    
+        except Exception as e:
+            obs.swallowed("robots_checker.py:_fetch_robots",
+                          fallback="disallow every URL for this run (RFC 9309: unreachable)",
+                          stage="robots", url=robots_url)
+            if isinstance(e, requests.exceptions.Timeout):
+                return self._disallow_all(domain, f"robots.txt not reachable (timeout after {timeout} s)")
+            return self._disallow_all(domain, f"robots.txt not reachable ({type(e).__name__})")
+
+        status = response.status_code
+        ok = 200 <= status < 300
+        obs.event("robots", "success" if ok else "fail",
+                  duration_ms=timer.ms(),
+                  error_type=None if ok else obs.classify_fetch(status, f"robots.txt status {status}"),
+                  error_message=None if ok else f"robots.txt status {status}",
+                  kind="robots_fetch", url=robots_url, status=status,
+                  served_by="requests(direct, no rate limit, no cloudscraper)",
+                  bytes=len(response.content or b""))
+
+        if ok:
+            parser = RobotExclusionRulesParser()
+            parser.parse(response.text)
+            logger.debug(f"Loaded robots.txt from {robots_url}")
+            return parser
+        if status >= 500:
+            obs.degraded("robots_checker.py:_fetch_robots",
+                         obs.classify_fetch(status, f"status {status}") or "http",
+                         f"robots.txt answered {status}",
+                         fallback="disallow every URL for this run (RFC 9309: unreachable)",
+                         stage="robots", url=robots_url)
+            return self._disallow_all(domain, f"robots.txt answered HTTP {status}")
+        # 4xx (and any other non-2xx): no robots.txt, every URL is allowed.
+        obs.degraded("robots_checker.py:_fetch_robots",
+                     obs.classify_fetch(status, f"status {status}") or "http",
+                     f"robots.txt answered {status}",
+                     fallback="treat every URL as allowed (RFC 9309: unavailable)",
+                     stage="robots", url=robots_url)
+        logger.debug(f"No robots.txt at {robots_url} (status {status})")
+        return None
+
+    def _disallow_all(self, domain: str, reason: str) -> RobotExclusionRulesParser:
+        """A parser that disallows every URL, for a robots.txt that could not be read."""
+        self.unreachable[domain] = reason
+        logger.warning(f"{reason}: every URL on {domain} is treated as disallowed (RFC 9309)")
+        parser = RobotExclusionRulesParser()
+        parser.parse("User-agent: *\nDisallow: /\n")
+        return parser
+
+    def unreachable_reason(self, url: str) -> Optional[str]:
+        """Why every URL on this host is disallowed (robots.txt 5xx / no answer), or None."""
+        self._get_parser(url)
+        return self.unreachable.get(urlparse(url).netloc)
+
     def _get_parser(self, url: str) -> Optional[RobotExclusionRulesParser]:
         """Get cached or fetch robots.txt parser for a URL."""
         parsed = urlparse(url)

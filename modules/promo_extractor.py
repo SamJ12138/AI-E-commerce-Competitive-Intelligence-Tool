@@ -10,6 +10,7 @@ Detects:
 - Analytics pixels
 """
 
+import copy
 import re
 import logging
 from typing import List, Dict, Optional, Tuple
@@ -21,6 +22,14 @@ from . import obs
 logger = logging.getLogger(__name__)
 
 
+
+def _text_without_controls(elem) -> str:
+    """Element text without its dismiss / close controls ("Dismiss", "Close")."""
+    elem = copy.copy(elem)
+    for control in elem.select('button, [class*="dismiss"], [class*="close"]'):
+        control.decompose()
+    return elem.get_text(strip=True)
+
 class PromoExtractor:
     """
     Extracts promotional elements and marketing tactics from pages.
@@ -28,6 +37,8 @@ class PromoExtractor:
     
     # Patterns for announcement bar detection - expanded for modern themes
     ANNOUNCEMENT_SELECTORS = [
+        # WooCommerce store notice (Customizer > WooCommerce > Store Notice)
+        '.woocommerce-store-notice',
         # Standard announcement bars
         '.announcement-bar',
         '.announcement',
@@ -254,7 +265,7 @@ class PromoExtractor:
         for selector in self.ANNOUNCEMENT_SELECTORS:
             elem = soup.select_one(selector)
             if elem:
-                text = elem.get_text(strip=True)
+                text = _text_without_controls(elem)
                 if text and len(text) > 5:
                     obs.note('announcement_bar', text[:500], 'selector',
                              f"ANNOUNCEMENT_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')}>")
@@ -297,7 +308,10 @@ class PromoExtractor:
         header = soup.find('header')
         if header:
             first_child = header.find()
-            if first_child and first_child.name in ('div', 'p', 'span'):
+            # A wrapper holding the logo and the menu is navigation, not an announcement.
+            is_navigation = first_child is not None and (
+                first_child.find(['nav', 'ul', 'ol']) is not None or len(first_child.find_all('a')) > 1)
+            if first_child and first_child.name in ('div', 'p', 'span') and not is_navigation:
                 text = first_child.get_text(strip=True)
                 if text and len(text) > 10 and len(text) < 200:
                     # Check if it looks like a promo

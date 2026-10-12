@@ -103,6 +103,7 @@ class HttpClient:
         self.config = config
         self.rate_limiter = RateLimiter(config.rate_limit_delay)
         self.last_chain = []  # branches tried by the last fetch() (read by analyze_site)
+        self.last_headers = {}  # response headers of the last fetch() (read by analyze_site)
         self.served_counts = {}  # netloc -> {branch that served a usable page: count}
         self.session = self._create_session()
         self.cloudscraper_session = self._create_cloudscraper() if CLOUDSCRAPER_AVAILABLE else None
@@ -356,6 +357,7 @@ class HttpClient:
         html, status, headers, error = result
         last = chain[-1] if chain else {}
         self.last_chain = list(chain)
+        self.last_headers = dict(headers or {})
         if html and not error:
             counts = self.served_counts.setdefault(urlparse(url).netloc, {})
             branch = last.get('served_by') or 'unknown'
