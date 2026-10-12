@@ -245,3 +245,25 @@ free returns 7 + 1 missing, loyalty 7 + 1 mismatch, payment methods 7 + 1 partia
   fail, two mutations were run and reverted: a made-up fact line in the prompt
   (`威胁等级: 高`) failed the prompt test; printing the insights under the recommendations heading
   failed the report test. 5 tests, about 2 s.
+
+## Batch 4 - dead extraction code
+
+- **`modules/policy_evidence.py` deleted** (460 lines). Only `modules/__init__.py` imported it, to
+  re-export it; no module, script or test used any of its names. The re-export is gone too.
+- **`modules/price_extractor.py` folded and deleted** (577 lines). main.py called it only when no
+  product had a price: seven methods over the homepage HTML, the first non-empty one wins. Every
+  real-store run log kept on this machine from Phases 3 to 5 (`js_price_fallback`, 90 firings)
+  shows only the last method producing the range: amounts written in the homepage text. That path
+  (amounts between 5 and 10000, the first 20, the page's own currency setting first) is now
+  `product_extractor.homepage_price_fallback`; the six methods that never produced a range on a
+  real store are deleted rather than covered with made-up pages. On the 11 saved homepages
+  (8 corpus stores, pfrankmd, 2 fixtures) the old and new fallback agree on 10; on rastaclat the
+  old inline-JS method would have read `"price": 299`, a value in cents, as $299, where the text
+  gives $5-$30 (rastaclat's products always had prices, so it never ran there).
+- The fallback reads any amount, so free-shipping thresholds and gift-card values count (brooklinen's
+  default run: $25-$500 from such amounts). It is kept as it was, labelled in the run log; whether
+  to keep it at all is a separate decision.
+- RED: `tests/test_dead_code.py` failed at collection (no `homepage_price_fallback`; both modules
+  still importable). GREEN: 361 passed. Fixture scores 17/0/0 on all four runs.
+- Coverage (`pytest --cov=modules --cov=main`): 76% -> 80% (statements 4794 -> 4357, missed
+  1149 -> 864); product_extractor 69% -> 71%, the moved function fully covered.

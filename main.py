@@ -39,7 +39,6 @@ from modules import (
     normalize_url, extract_domain, deduplicate_urls, site_identity,
     detect_platform, discover_pages,
     extract_products, calculate_price_stats,
-    extract_prices_from_js, extract_price_stats_from_html,
     extract_promotions, extract_policies, extract_policies_from_homepage_js,
     extract_trust_signals,
     extract_categories as extract_categories_module,
@@ -715,7 +714,8 @@ def analyze_site(
     if not intel.price_min and html_str:
         logger.info("No prices from product extraction, trying JavaScript fallback...")
         obs.event("products", "skip", kind="js_price_fallback", reason="no product price; scanning homepage html")
-        js_price_min, js_price_max, js_price_median, js_currency = extract_price_stats_from_html(html_str)
+        from modules.product_extractor import homepage_price_fallback
+        js_price_min, js_price_max, js_price_median, js_currency = homepage_price_fallback(html_str)
         if js_price_min is not None:
             intel.price_min = js_price_min
             intel.price_max = js_price_max
