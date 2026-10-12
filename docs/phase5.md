@@ -224,3 +224,24 @@ free returns 7 + 1 missing, loyalty 7 + 1 mismatch, payment methods 7 + 1 partia
 - barefootbuttons: products 4 -> 3 of 4, a Batch 1 effect: one collection, so 10 products
   instead of 50.
 - porterandyork: free returns match -> missing; the returns page timed out in this run.
+
+## Batch 3 - the --ai step
+
+- `ollama --version`: command not found. Ollama is not installed on this machine (the `ollama`
+  Python package is, in the venv), so there is no sample from a real model and no
+  `docs/sample/ai/`. The README says the step is implemented but not verified with a real model.
+- `tests/test_ai_fake_ollama.py` runs `main.py --ai --ai-model fake-model:1` on the Shopify-style and
+  the blocked fixture stores with a stand-in `ollama` module (its `list()` offers the model, its
+  `chat()` records each call and answers). It checks: two calls, both for the store that was read
+  and none for the blocked one; every fact line of the insight prompt has a known label and the
+  value the pipeline reported in `report.csv` (domain, platform, price range, threshold, return
+  window, free returns, review platform, payment methods, email capture), and a value the pipeline
+  did not produce (review count) is left out, with no "N/A" or "None"; the positioning prompt quotes
+  the page's own description; `report.md` prints the insights, the recommendation and the
+  positioning text under "Key Insights (AI)", "Actionable Recommendations (AI)" and "Brand
+  Positioning Analysis (AI)" in that store's section, with the model named, and nothing from the
+  model in the blocked store's section; `business_report.md` names the model.
+- The code under test already existed, so there was no failing test to fix. To check the test can
+  fail, two mutations were run and reverted: a made-up fact line in the prompt
+  (`威胁等级: 高`) failed the prompt test; printing the insights under the recommendations heading
+  failed the report test. 5 tests, about 2 s.

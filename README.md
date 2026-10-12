@@ -79,6 +79,11 @@ model's text is in Chinese whatever `--lang` says. Nothing is sent to a cloud se
 `--ai`, or when Ollama is not running (a warning says so), all text is rule-based and the
 business report says the LLM step did not run.
 
+The `--ai` step is implemented but has not been verified with a real model: Ollama was not
+installed on the machine this was developed on. It is tested end to end against a fake Ollama
+client (`tests/test_ai_fake_ollama.py`: what the model is asked, and where its answer appears in
+the reports), not for the quality of what a real model writes.
+
 **Monitor mode and change detection.** Every scan is stored in `data/intel_cache.db`. With
 `--monitor`, each store is compared with the newest earlier scan of the same store and `report.md`
 lists what changed: lowest and highest price, announcement bar text, featured products added or
@@ -246,7 +251,8 @@ venv\Scripts\python -m pytest -q
   check out.
 - A store skipped because of robots.txt is not in the reports (the console and the run log say
   why).
-- The `--ai` text is always in Chinese and needs a local Ollama install.
+- The `--ai` text is always in Chinese and needs a local Ollama install; the step has been tested
+  only against a fake Ollama client.
 
 ## License
 
