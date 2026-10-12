@@ -30,6 +30,24 @@ def _text_without_controls(elem) -> str:
         control.decompose()
     return elem.get_text(strip=True)
 
+
+# Privacy / terms / cookie blocks a page embeds (allbirds' homepage holds its privacy policy in a
+# hidden modal): their wording ("loyalty programs", "refer a friend") describes the policy, not an
+# offer. Matched on id and class names; <html>, <body> and <main> are never dropped.
+LEGAL_BLOCK = re.compile(r'privacy|terms|cookie|consent|gdpr', re.I)
+
+
+def _text_without_legal_blocks(soup) -> str:
+    """Page text, lower-cased and whitespace-collapsed, without privacy / terms / cookie blocks."""
+    soup = copy.copy(soup)
+    for elem in soup.find_all(True):
+        if elem.decomposed or elem.name in ('html', 'body', 'main', '[document]'):
+            continue
+        names = ' '.join([elem.get('id') or ''] + list(elem.get('class') or []))
+        if names.strip() and LEGAL_BLOCK.search(names):
+            elem.decompose()
+    return ' '.join(soup.get_text(' ').lower().split())
+
 class PromoExtractor:
     """
     Extracts promotional elements and marketing tactics from pages.
@@ -383,8 +401,9 @@ class PromoExtractor:
         return False
     
     def _detect_loyalty(self, soup: BeautifulSoup, html_str: str) -> bool:
-        """Detect a loyalty program: program wording in the text, or a loyalty app's signature."""
-        text_lower = ' '.join(soup.get_text(' ').lower().split())
+        """Detect a loyalty program: program wording in the text (privacy / terms / cookie blocks
+        left out), or a loyalty app's signature."""
+        text_lower = _text_without_legal_blocks(soup)
 
         for pattern in self.LOYALTY_PATTERNS:
             match = re.search(pattern, text_lower)
@@ -405,8 +424,8 @@ class PromoExtractor:
         return False
     
     def _detect_referral(self, soup: BeautifulSoup, html_str: str) -> bool:
-        """Detect referral program indicators."""
-        text_lower = soup.get_text().lower()
+        """Detect referral program indicators (privacy / terms / cookie blocks left out)."""
+        text_lower = _text_without_legal_blocks(soup)
 
         for keyword in self.REFERRAL_KEYWORDS:
             if keyword in text_lower:

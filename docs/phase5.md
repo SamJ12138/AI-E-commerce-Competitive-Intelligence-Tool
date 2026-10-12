@@ -62,3 +62,16 @@ end of the batch.
 - RED: `tests/test_product_page_price.py` 4 of 6 failed (price None); the other two are controls.
   On the four saved allbirds product pages (scratch copies from the ground-truth reading, no new
   fetch) the extractor now gives 100, 75, 140 and 105, the ground-truth prices.
+
+### allbirds: privacy and terms text is not a loyalty program
+
+- allbirds' homepage holds its privacy policy and terms of service in hidden modals
+  (`div#modal-privacy-policy`, `div#modal-terms-of-service`); "participate in promotions or loyalty
+  programs" there set has_loyalty, and the same text set has_referral. Promo detection only reads
+  the homepage, so the brief's "policy/privacy/terms pages" are, in the code, blocks inside a page:
+  loyalty and referral wording is now read without elements whose id or class names privacy,
+  terms, cookie, consent or GDPR (never `<html>`, `<body>` or `<main>`). Loyalty-app signatures in
+  the raw HTML still count.
+- RED: `tests/test_promo_legal_text.py` 3 of 4 failed (loyalty / referral True from a privacy modal,
+  terms text and a cookie banner; the fourth is the control). On the seven saved homepages only
+  allbirds changes (loyalty and referral True -> False).
