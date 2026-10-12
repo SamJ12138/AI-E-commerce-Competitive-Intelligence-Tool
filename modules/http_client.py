@@ -99,14 +99,6 @@ class HttpClient:
     4. Requests - Basic HTTP
     """
     
-    # Sites known to have strong bot protection - need special handling
-    PROTECTED_SITES = [
-        'lululemon.com',
-        'shop.lululemon.com',
-        'nike.com',
-        'adidas.com',
-    ]
-    
     def __init__(self, config: Config):
         self.config = config
         self.rate_limiter = RateLimiter(config.rate_limit_delay)
@@ -310,10 +302,7 @@ class HttpClient:
         use_js = render_js if render_js is not None else self.config.render_js
         parsed = urlparse(url)
         domain = parsed.netloc
-        
-        # Check if this is a protected site that needs special handling
-        is_protected = any(site in domain for site in self.PROTECTED_SITES)
-        
+
         # Apply rate limiting
         timer = obs.Timer()
         self.rate_limiter.wait(domain)
@@ -327,20 +316,12 @@ class HttpClient:
             if result[1] == 403 or result[3]:
                 logger.info(f"Browser fetch failed for {domain}, trying fallbacks...")
 
-                # Fallback 1: Try cloudscraper for Cloudflare bypass
+                # Fallback: Try cloudscraper for Cloudflare bypass
                 if CLOUDSCRAPER_AVAILABLE and self.cloudscraper_session:
                     logger.info(f"Trying cloudscraper for {domain}")
                     result = self._attempt('cloudscraper', self._fetch_with_cloudscraper, url, chain)
-                    if result[0] and not result[3]:
-                        self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
-                        return result
 
-                # Fallback 2: For protected sites, return placeholder
-                if is_protected:
-                    logger.info(f"Protected site {domain}, returning placeholder")
-                    result = self._attempt('placeholder', self._fetch_protected_site, url, chain)
-
-            self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
+            self._log_fetch(url, result, chain, use_js, wait_ms, timer)
             return result
         else:
             # Try regular requests first
@@ -351,7 +332,7 @@ class HttpClient:
                 logger.info(f"Requests got 403, trying cloudscraper for {domain}")
                 result = self._attempt('cloudscraper', self._fetch_with_cloudscraper, url, chain)
 
-            self._log_fetch(url, result, chain, use_js, is_protected, wait_ms, timer)
+            self._log_fetch(url, result, chain, use_js, wait_ms, timer)
             return result
 
     def _attempt(self, branch: str, fn, url: str, chain: list):
@@ -370,7 +351,7 @@ class HttpClient:
         })
         return result
 
-    def _log_fetch(self, url, result, chain, use_js, is_protected, wait_ms, timer) -> None:
+    def _log_fetch(self, url, result, chain, use_js, wait_ms, timer) -> None:
         """One 'fetch' event per fetch() call: which branch served it, status, bytes."""
         html, status, headers, error = result
         last = chain[-1] if chain else {}
@@ -386,7 +367,7 @@ class HttpClient:
             error_message=error if error else (None if html else "Empty response"),
             url=url, status=status, served_by=last.get('served_by'),
             bytes=last.get('bytes', 0), chain=chain, render_js=use_js,
-            protected_site=is_protected, rate_limit_wait_ms=round(wait_ms, 2),
+            rate_limit_wait_ms=round(wait_ms, 2),
             caller_stage=obs.current_stage(),
             server_header=(headers or {}).get('Server') or (headers or {}).get('server'),
         )
@@ -424,41 +405,6 @@ class HttpClient:
             else:
                 logger.info(f"Cloudscraper failed: {type(e).__name__}")
             return None, 0, {}, f"Cloudscraper error: {str(e)}"
-    
-    def _fetch_protected_site(
-        self,
-        url: str
-    ) -> Tuple[Optional[str], int, Dict[str, str], Optional[str]]:
-        """
-        Special handling for sites with strong bot protection.
-        Returns minimal data with explanation rather than error.
-        """
-        parsed = urlparse(url)
-        domain = parsed.netloc
-        
-        # Create a placeholder response explaining the limitation
-        logger.warning(f"Site {domain} has strong bot protection - limited data available")
-        obs.degraded("http_client.py:_fetch_protected_site", "blocked",
-                     "PROTECTED_SITES match: synthetic placeholder HTML returned with status 200",
-                     fallback="placeholder page", stage="fetch", event_name="fail", url=url)
-        
-        # Return a minimal HTML response that explains the situation
-        # This allows the tool to continue without crashing
-        placeholder_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>{domain}</title></head>
-        <body>
-            <h1>{domain}</h1>
-            <p>This site has strong bot protection that prevents automated access.</p>
-            <p>Manual analysis recommended for this competitor.</p>
-            <meta name="platform" content="protected">
-            <meta name="note" content="Bot protection detected - limited automated data available">
-        </body>
-        </html>
-        """
-        
-        return placeholder_html, 200, {'X-Bot-Protection': 'detected'}, None
     
     def _fetch_with_requests(
         self,

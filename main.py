@@ -375,17 +375,6 @@ def analyze_site(
     html_str = str(soup)
     obs.end("fetch_homepage", t, url=url, status=status, chars=len(html_str))
 
-    # Check if this is a protected site placeholder
-    is_protected_site = 'Bot protection detected' in html_str or 'strong bot protection' in html_str
-    if is_protected_site:
-        # The placeholder is synthetic HTML from HttpClient, not the site: nothing on it is data.
-        obs.degraded("main.py:analyze_site", "blocked", "homepage is the PROTECTED_SITES placeholder",
-                     fallback="site reported as blocked; placeholder HTML not analysed",
-                     stage="fetch_homepage", event_name="fail")
-        intel.errors.append("Site has bot protection: only the tool's placeholder page was returned.")
-        _mark_not_seen(intel, getattr(client, 'last_chain', None) or [], "PROTECTED_SITES placeholder")
-        return intel
-    
     # Step 2: Detect platform
     update_progress("Detecting platform...")
     t = obs.begin("platform", note="homepage fetched a second time only to read response headers")

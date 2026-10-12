@@ -19,7 +19,7 @@ Owner decisions already taken:
 | `modules/http_client.py:1-12` | Module docstring: "ANTI-BOT BYPASS HIERARCHY" (patchright -> playwright with stealth -> cloudscraper -> requests). |
 | `modules/http_client.py:31-49` | Prefers `patchright` ("patches CDP leaks, bypasses Cloudflare/DataDome"), falls back to `playwright`. |
 | `modules/http_client.py:51-56` | Optional `cloudscraper` import ("Cloudflare bypass without browser"). |
-| `modules/http_client.py:103-108` | `PROTECTED_SITES` (lululemon.com, shop.lululemon.com, nike.com, adidas.com). |
+| `modules/http_client.py:103-108` | `PROTECTED_SITES` (lululemon.com, shop.lululemon.com, nike.com, adidas.com). **Deleted in Phase 3 Batch 1**: generated content, not a bypass, so not covered by A3. |
 | `modules/http_client.py:138-153` | `_create_cloudscraper()`: cloudscraper session posing as desktop Chrome on Windows. |
 | `modules/http_client.py:155-189` | `_create_session()`: full browser header set (`sec-ch-ua`, `Sec-Fetch-*`, `Upgrade-Insecure-Requests`, Chrome 120 UA) "to look like real browser". |
 | `modules/models.py:334` | Default `user_agent`: a desktop Chrome 120 string (no tool identification). |
@@ -27,9 +27,9 @@ Owner decisions already taken:
 | `modules/http_client.py:253-279` | Stealth init script when the engine is plain playwright: `navigator.webdriver` -> undefined (:257), fake `window.chrome`, fake `navigator.plugins`, fixed `navigator.languages`, patched `permissions.query`. |
 | `modules/http_client.py:292-353` | `fetch()` fallback chains: default `requests -(403)-> cloudscraper`; `--render-js`: `browser -(403/error)-> cloudscraper -> placeholder`. |
 | `modules/http_client.py:387-419` | `_fetch_with_cloudscraper()`. |
-| `modules/http_client.py:421-454` | `_fetch_protected_site()`: returns synthetic HTML with status 200 and header `X-Bot-Protection: detected` for `PROTECTED_SITES`. |
+| `modules/http_client.py:421-454` | `_fetch_protected_site()`: returns synthetic HTML with status 200 and header `X-Bot-Protection: detected` for `PROTECTED_SITES`. **Deleted in Phase 3 Batch 1.** |
 | `modules/http_client.py:523-580` | `_fetch_with_playwright()`; on `net::ERR_*` falls back to a plain requests fetch (:569-576). |
-| `main.py:479-487` | Recognises the placeholder page and records "Site has bot protection" while continuing to extract from it. |
+| `main.py:479-487` | Recognises the placeholder page and records "Site has bot protection" while continuing to extract from it. **Deleted in Phase 3 Batch 1.** |
 | `main.py:11`, `main.py:964` | `--ignore-robots` (docstring example and CLI flag); `main.py:1020` reads `ignore_robots` from config too. |
 | `modules/robots_checker.py:102-104` | `is_allowed()` returns True for every URL when `ignore_robots` is set; `get_crawl_delay()` (:142) also returns None. |
 | `main.py:1106-1108` | Site-level robots check skipped when `ignore_robots` is set. |

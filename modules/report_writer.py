@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 BRANCH_NAMES = {
     'en': {'requests': 'requests', 'browser': 'browser', 'cloudscraper': 'cloudscraper',
-           'placeholder': 'placeholder page', 'no response': 'no response'},
+           'no response': 'no response'},
     'zh': {'requests': 'HTTP 请求', 'browser': '浏览器', 'cloudscraper': 'cloudscraper',
-           'placeholder': '占位页', 'no response': '无响应'},
+           'no response': '无响应'},
 }
 NOT_SEEN_TEXT = {
     'en': {

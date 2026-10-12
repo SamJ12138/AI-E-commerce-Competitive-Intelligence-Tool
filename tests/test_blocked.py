@@ -4,11 +4,9 @@ import csv
 from pathlib import Path
 
 import pytest
-from bs4 import BeautifulSoup
 
 from tests.conftest import analyze_store
 from modules.business_report import BusinessReportGenerator
-from modules.models import Config
 from modules.report_writer import ReportWriter
 from modules.snapshot_store import SnapshotStore
 
@@ -91,34 +89,3 @@ def test_no_change_report_against_or_from_a_blocked_scan(tmp_path, analyzed, blo
     ok = analyzed["shopify_basic"]
     assert store.compute_changes(blocked, ok.to_dict()) is None
     assert store.compute_changes(ok, blocked.to_dict()) is None
-
-
-class PlaceholderClient:
-    """HttpClient stand-in whose fetch fell through to the PROTECTED_SITES placeholder."""
-
-    last_chain = [{"branch": "browser", "status": 403}, {"branch": "cloudscraper", "status": 403},
-                  {"branch": "placeholder", "status": 200}]
-
-    def fetch_and_parse(self, url, **kw):
-        html = "<html><body><h1>Bot protection detected</h1><p>strong bot protection</p></body></html>"
-        return BeautifulSoup(html, "html.parser"), 200, None
-
-    def fetch(self, url, **kw):
-        return None, 404, {}, "not used"
-
-
-def test_protected_site_placeholder_is_reported_as_blocked():
-    import main
-
-    class AllowAll:
-        def is_allowed(self, url):
-            return True
-
-        def get_sitemaps(self, url):
-            return []
-
-    intel = main.analyze_site("https://www.example-protected.test", PlaceholderClient(), AllowAll(),
-                              Config(rate_limit_delay=0))
-    assert intel.status == "blocked"
-    assert intel.fetch_attempts == ["browser 403", "cloudscraper 403", "placeholder 200"]
-    assert intel.platform is None and intel.has_popup is None

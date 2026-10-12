@@ -221,7 +221,8 @@ the `logs/` directory.
 - The "~22 guessed priority pages" are exactly 22; 20 survive `max_pages`, 19 are fetched.
 - Owner decision A3 describes the fallback chain as `requests 403 -> cloudscraper -> browser`. The
   code has two chains: `requests -(403 only)-> cloudscraper` by default, and
-  `browser -(403 or error)-> cloudscraper -> placeholder (PROTECTED_SITES only)` with
+  `browser -(403 or error)-> cloudscraper -> placeholder (PROTECTED_SITES only; the placeholder was
+  deleted in Phase 3 Batch 1)` with
   `--render-js`. The browser never runs after cloudscraper. The blocked fixture is therefore run
   twice (with and without `--render-js`) to exercise both.
 - The brief's stage order (`discovery` before `platform`, `promos/trust/categories` after
@@ -325,7 +326,7 @@ Places where the code quietly substitutes a default or a weaker source. Each now
 |---|---|---|---|---|
 | `main.py:305` | `extract_categories` | category_extractor found nothing | parse | legacy nav selectors |
 | `main.py:467` | `analyze_site` | homepage fetch failed; analysis stops here | obs.classify_fetch(status, error) or 'http' | SiteIntelligence with defaults is still saved and reported (and AI-scored with --ai) |
-| `main.py:482` | `analyze_site` | homepage is the PROTECTED_SITES placeholder | blocked | continue extracting from placeholder HTML |
+| `main.py:482` | `analyze_site` | homepage is the PROTECTED_SITES placeholder | blocked | continue extracting from placeholder HTML (deleted in Phase 3 Batch 1) |
 | `main.py:664` | `analyze_site` | f'products.json unavailable: {error}' | obs.classify_fetch(status, error) or 'http' | HTML pages only |
 | `main.py:798` | `analyze_site` | no products extracted from any page | parse | homepage JS price fallback |
 | `main.py:830` | `analyze_site` | no shipping policy parsed from any page | parse | ad-hoc ShippingPolicy from homepage promo threshold, regions=['United States'] |
@@ -339,7 +340,7 @@ Places where the code quietly substitutes a default or a weaker source. Each now
 | `modules/ai_analyzer.py:501` | `predict_optimal_price` | no sklearn model | unknown | competitor_price * 0.9 rule |
 | `modules/http_client.py:131` | `__init__` | patchright not importable | unknown | f'browser engine = {BROWSER_ENGINE}' |
 | `modules/http_client.py:135` | `__init__` | cloudscraper not importable | unknown | no cloudscraper branch |
-| `modules/http_client.py:434` | `_fetch_protected_site` | PROTECTED_SITES match: synthetic placeholder HTML returned with status 200 | blocked | placeholder page |
+| `modules/http_client.py:434` | `_fetch_protected_site` | PROTECTED_SITES match: synthetic placeholder HTML returned with status 200 | blocked | placeholder page (deleted in Phase 3 Batch 1) |
 | `modules/http_client.py:599` | `fetch_and_parse` | empty body with no error | http | returned (None, status, 'Empty response') |
 | `modules/page_discovery.py:98` | `discover` | f'{len(discovered)} guessed/sitemap pages already >= max_pages={self.config.max_pages}' | unknown | homepage links are never crawled |
 | `modules/page_discovery.py:155` | `_fetch_sitemap` | invalid sitemap URL | input_invalid | [] |

@@ -73,15 +73,15 @@ one `fetch` event (url, status, `served_by`, bytes, branch chain, rate-limit wai
 ### fetch (HttpClient)
 - **Owner:** `HttpClient.fetch()` modules/http_client.py:292; branches `_fetch_with_requests` :456,
   `_fetch_with_playwright` :523 (patchright if importable, else playwright), `_fetch_with_cloudscraper`
-  :387, `_fetch_protected_site` :421; `fetch_and_parse()` :582 wraps it with BeautifulSoup (lxml).
+  :387; `fetch_and_parse()` :582 wraps it with BeautifulSoup (lxml).
 - **Input:** URL, `render_js` flag.
 - **Output:** `(html, status, headers, error)`; `fetch_and_parse` returns `(soup, status, error)`.
 - **Branches** (logged as `chain` and `served_by`):
   - default: `requests` (urllib3 Retry: 3 retries on 429/5xx, backoff 1 s) -> on **403 only**
     -> `cloudscraper`.
-  - `--render-js`: `browser` -> on 403 or any error -> `cloudscraper` -> if that fails and the
-    domain is in `PROTECTED_SITES` (:103: lululemon, nike, adidas) -> `placeholder` (synthetic HTML,
-    status 200). A browser `net::ERR_*` falls back to a plain requests fetch inside the browser
+  - `--render-js`: `browser` -> on 403 or any error -> `cloudscraper`. (Until Phase 3 a failed
+    chain for lululemon / nike / adidas ended in a synthetic 200 "placeholder" page; deleted, see
+    docs/phase3.md.) A browser `net::ERR_*` falls back to a plain requests fetch inside the browser
     branch (`served_by = browser->requests`).
   - There is no `requests -> cloudscraper -> browser` chain: the browser only runs with
     `--render-js`, and then it runs first.
@@ -93,7 +93,6 @@ one `fetch` event (url, status, `served_by`, bytes, branch chain, rate-limit wai
     `raise_for_status()` and also become `Request error: ...`.
   - SSL errors are retried with `verify=False` (silent downgrade).
   - Browser fetch waits a fixed 3 s (or 2 s after a failed `wait_for_selector`) per page.
-  - The placeholder path returns status 200 with fabricated HTML; downstream treats it as a page.
 
 ### fetch_homepage (start of analyze_site)
 - **Owner:** main.py:458-473.
