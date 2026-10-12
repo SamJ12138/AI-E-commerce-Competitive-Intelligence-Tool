@@ -134,3 +134,14 @@ end of the batch.
 - RED: `tests/test_email_capture.py` 4 of 8 failed, then 2 more once the fixture had barefootbuttons'
   span inside the menu link (the first fix only skipped the `li` itself and the saved homepage still
   matched the span). On the saved homepages only barefootbuttons changes (True -> False).
+
+### porterandyork: email capture unknown when only a form script is loaded
+
+- porterandyork's HTML has no email field or sign-up text, but Klaviyo's onsite script is loaded and
+  can draw a sign-up form in the browser; the ground truth is "undeterminable from the HTML" and the
+  tool said False. When no sign-up is found and a form script is loaded (Klaviyo onsite, Privy,
+  Omnisend, Mailchimp's popup script, Justuno, OptinMonster), `has_email_capture` is now None
+  (unknown): an empty CSV cell, "unknown" in the pressure-score inputs, absent from the tactic
+  lists. With `--render-js` the drawn form is in the page and gives a definite answer.
+- RED: 2 new cases in `tests/test_email_capture.py` failed (False instead of None; the report
+  case); two controls passed. On the saved homepages only porterandyork changes (False -> None).

@@ -50,3 +50,34 @@ def test_each_alone_is_not_email_capture(body):
 ])
 def test_newsletter_signups_still_count(body):
     assert _email(body) is True
+
+
+# porterandyork: no email field in the HTML, but Klaviyo's onsite script is loaded and can draw a
+# sign-up form in the browser. Without --render-js the tool cannot see it: unknown, not False.
+KLAVIYO = '<script async src="//static.klaviyo.com/onsite/js/RwKyn/klaviyo.js?company_id=RwKyn"></script>'
+
+
+def test_only_a_form_script_is_unknown():
+    assert _email(KLAVIYO + "<footer><p>Questions? Call us.</p></footer>") is None
+
+
+def test_a_form_script_and_a_form_is_true():
+    assert _email(KLAVIYO + '<footer><form class="newsletter-form"><input type="email" name="email">'
+                            '</form></footer>') is True
+
+
+def test_no_form_and_no_script_is_false():
+    assert _email("<footer><p>Questions? Call us.</p></footer>") is False
+
+
+def test_unknown_email_capture_in_the_reports(tmp_path):
+    import csv
+    from modules.pressure_score import score_pressure
+    from modules.report_writer import ReportWriter
+    from tests.page_server import analyze_pages, shopify_page
+    intel, _ = analyze_pages({"/": shopify_page("<main><h1>Meat</h1></main>" + KLAVIYO)})
+    assert intel.has_email_capture is None
+    _md, path = ReportWriter(str(tmp_path), language="en").write_full_report([intel], {intel.domain: None})
+    assert next(csv.DictReader(open(path, encoding="utf-8-sig")))["has_email_capture"] == ""
+    marketing = next(f for f in score_pressure(intel)["factors"] if f["key"] == "marketing_sophistication")
+    assert marketing["inputs"]["has_email_capture"] is None

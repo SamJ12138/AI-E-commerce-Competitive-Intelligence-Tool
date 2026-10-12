@@ -184,6 +184,16 @@ class PromoExtractor:
         'Okendo Loyalty': ['okendo-loyalty'],
     }
     
+    # Scripts that draw email sign-up forms in the browser (signature in the raw HTML)
+    EMAIL_FORM_SCRIPTS = {
+        'Klaviyo': 'static.klaviyo.com/onsite',
+        'Privy': 'widget.privy.com',
+        'Omnisend': 'omnisnippet',
+        'Mailchimp': 'chimpstatic.com',
+        'Justuno': 'justuno.com',
+        'OptinMonster': 'optinmonster',
+    }
+
     REFERRAL_KEYWORDS = [
         'refer a friend', 'referral', 'refer and earn',
         'give $', 'get $', 'refer & earn', 'share and earn'
@@ -255,7 +265,7 @@ class PromoExtractor:
         result['has_popup'] = self._detect_popup(soup, html_str)
         
         # Detect email capture
-        result['has_email_capture'] = self._detect_email_capture(soup)
+        result['has_email_capture'] = self._detect_email_capture(soup, html_str)
         
         # Detect loyalty program
         result['has_loyalty_program'] = self._detect_loyalty(soup, html_str)
@@ -383,7 +393,7 @@ class PromoExtractor:
         obs.note('has_popup', False, 'default', "no POPUP_SELECTORS or popup library substring matched")
         return False
     
-    def _detect_email_capture(self, soup: BeautifulSoup) -> bool:
+    def _detect_email_capture(self, soup: BeautifulSoup, html_str: str = '') -> Optional[bool]:
         """Detect a sign-up for marketing email. Account forms (login, register, password, checkout,
         search, cart) and menu entries without a field of their own (barefootbuttons' header
         "Newsletter" item links to a sign-up that is not on the page) are not one."""
@@ -417,6 +427,16 @@ class PromoExtractor:
             if any(word in text for word in ['newsletter', 'subscribe', 'signup', 'join']):
                 obs.note('has_email_capture', True, 'regex', "form text contains newsletter/subscribe/signup/join")
                 return True
+
+        # No sign-up in the HTML, but a script that draws sign-up forms in the browser is loaded
+        # (porterandyork: Klaviyo's onsite script): without --render-js that form cannot be seen.
+        html_lower = (html_str or '').lower()
+        for name, signature in self.EMAIL_FORM_SCRIPTS.items():
+            if signature in html_lower:
+                obs.note('has_email_capture', None, 'default',
+                         f"no sign-up in the HTML, but {name}'s form script is loaded ({signature!r}); "
+                         "its form is drawn by JavaScript: unknown")
+                return None
 
         obs.note('has_email_capture', False, 'default',
                  "no email capture selector, email input or form keyword outside account forms and menu entries")
