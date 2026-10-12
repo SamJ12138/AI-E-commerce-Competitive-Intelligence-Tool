@@ -3,6 +3,8 @@
 
 # Core HTTP and parsing
 requests>=2.31.0
+# Brotli decoding for urllib3 (Content-Encoding: br, sent by Cloudflare-fronted stores)
+brotli>=1.1.0
 beautifulsoup4>=4.12.0
 lxml>=5.1.0
 

@@ -127,3 +127,25 @@ What the baseline shows (10 fields per store: status plus the 9 ground-truth fie
   `requests 403`, every field null: 10/10. Its robots.txt sets `Crawl-delay: 60`, which the tool
   does not read (one homepage request, so it did not matter here).
 - **pfrankmd is not a store any more** (a dermatology clinic site); kept because it is in sites.txt.
+
+## Batch 4 - fix what the corpus found
+
+Each fix: RED on a hand-written fixture that reproduces the real page's structure, GREEN, full suite,
+then one rerun of the 8 stores (`scripts/real_corpus.py run`, same settings as Batch 3).
+
+### Fix 1 - Brotli (6 stores: allbirds, brooklinen, deathwishcoffee, pfrankmd, porterandyork, rastaclat)
+
+- `brotli>=1.1.0` added to requirements.txt (and installed in the venv): urllib3 decodes
+  `Content-Encoding: br` only when a Brotli library is importable. The browser header set is
+  unchanged (A3): `Accept-Encoding: gzip, deflate, br` is still sent, now with a decoder behind it.
+- If no Brotli library is importable, `br` is no longer offered (`Accept-Encoding: gzip, deflate`)
+  and an obs `degraded` event says so.
+- A response whose `Content-Encoding` this environment cannot decode (`undecodable_encoding()`,
+  checked against urllib3's own `ACCEPT_ENCODING`) is a fetch error ("Undecodable Content-Encoding:
+  x"), in the requests branch, its SSL retry and the cloudscraper branch: compressed bytes are never
+  parsed as a page.
+- Fixture: `tests/fixtures/encoded/shopify_home.html` (hand-written Dawn-style homepage) and its
+  Brotli copy `shopify_home.html.br` (made once with brotli 1.2.0; a test checks they agree), served
+  by a CDN-like local server that answers Brotli when offered, else gzip, else identity
+  (`tests/test_content_encoding.py`). RED without brotli in the venv: 4 failed (platform
+  `Custom/Unknown`, as on the real stores), 1 skipped.

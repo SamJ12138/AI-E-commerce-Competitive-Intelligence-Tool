@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lantern Row &ndash; Candles poured in small batches</title>
+  <meta name="description" content="Lantern Row pours soy candles in small batches.">
+  <script>
+    var Shopify = Shopify || {};
+    Shopify.shop = "lantern-row.myshopify.com";
+    Shopify.theme = {"name":"Dawn","id":140000000002,"schema_name":"Dawn","role":"main"};
+    Shopify.routes = Shopify.routes || {};
+    Shopify.routes.root = "/";
+  </script>
+</head>
+<body>
+  <div class="announcement-bar" role="region"><p class="announcement-bar__message">Free shipping on orders over $75</p></div>
+  <header class="header"><a href="/" class="header__heading-link">Lantern Row</a>
+    <nav><ul><li><a href="/collections/all">Shop</a></li><li><a href="/pages/faq">FAQ</a></li></ul></nav>
+  </header>
+  <main>
+    <h2>Featured</h2>
+    <ul class="grid product-grid">
+      <li class="grid__item"><div class="card-wrapper product-card-wrapper">
+        <h3 class="card__heading"><a href="/products/cedar-candle">Cedar Candle</a></h3>
+        <div class="price"><span class="price-item price-item--regular">$28.00 USD</span></div>
+      </div></li>
+      <li class="grid__item"><div class="card-wrapper product-card-wrapper">
+        <h3 class="card__heading"><a href="/products/fig-candle">Fig Candle</a></h3>
+        <div class="price price--on-sale"><s class="price-item price-item--regular">$34.00 USD</s>
+          <span class="price-item price-item--sale">$26.00 USD</span></div>
+      </div></li>
+    </ul>
+  </main>
+  <footer>
+    <form method="post" action="/contact#contact_form" class="newsletter-form">
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      <label for="NewsletterForm--footer">Email</label>
+      <input id="NewsletterForm--footer" type="email" name="contact[email]" placeholder="Email">
+      <button type="submit">Subscribe</button>
+    </form>
+    <small><a href="https://www.shopify.com?utm_source=onlinestore">Powered by Shopify</a></small>
+  </footer>
+</body>
+</html>

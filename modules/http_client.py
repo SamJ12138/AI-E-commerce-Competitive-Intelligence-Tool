@@ -26,6 +26,7 @@ logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from urllib3.util.request import ACCEPT_ENCODING
 from bs4 import BeautifulSoup
 
 # Try Patchright first (best for bot detection bypass)
@@ -54,6 +55,25 @@ try:
     CLOUDSCRAPER_AVAILABLE = True
 except ImportError:  # obs: import-time, reported by HttpClient.__init__
     CLOUDSCRAPER_AVAILABLE = False
+
+# urllib3 decodes Content-Encoding: br only when a Brotli library is installed; without one the
+# body would be compressed bytes, so br is then not offered.
+try:
+    import brotli  # noqa: F401
+    BROTLI_AVAILABLE = True
+except ImportError:  # obs: import-time, reported by HttpClient.__init__
+    BROTLI_AVAILABLE = False
+
+# Encodings urllib3 can decode in this environment (it adds br / zstd when their libraries exist).
+DECODABLE_ENCODINGS = {e.strip() for e in ACCEPT_ENCODING.split(',')} | {'identity', ''}
+
+
+def undecodable_encoding(headers) -> Optional[str]:
+    """The Content-Encoding token this client cannot decode (the body is still compressed), or None."""
+    for token in (headers.get('Content-Encoding') or '').lower().split(','):
+        if token.strip() not in DECODABLE_ENCODINGS:
+            return token.strip()
+    return None
 
 from .models import Config
 from . import obs
@@ -126,6 +146,9 @@ class HttpClient:
             obs.degraded("http_client.py:<import>", "unknown",
                          "patchright not importable", fallback=f"browser engine = {BROWSER_ENGINE}",
                          stage="fetch")
+        if not BROTLI_AVAILABLE:
+            obs.degraded("http_client.py:<import>", "unknown", "brotli not importable",
+                         fallback="Accept-Encoding without br", stage="fetch")
         if not CLOUDSCRAPER_AVAILABLE:
             obs.degraded("http_client.py:<import>", "unknown",
                          "cloudscraper not importable", fallback="no cloudscraper branch", stage="fetch")
@@ -167,7 +190,7 @@ class HttpClient:
             "User-Agent": self.config.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate, br" if BROTLI_AVAILABLE else "gzip, deflate",
             "DNT": "1",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
@@ -393,6 +416,9 @@ class HttpClient:
             if response.status_code == 404:
                 return None, 404, headers, "Page not found (404)"
             
+            bad = undecodable_encoding(response.headers)
+            if bad:
+                return None, response.status_code, headers, f"Undecodable Content-Encoding: {bad}"
             response.encoding = response.apparent_encoding or 'utf-8'
             logger.info(f"Cloudscraper succeeded for {url}")
             return response.text, response.status_code, headers, None
@@ -435,6 +461,10 @@ class HttpClient:
                 return None, 429, headers, "Rate limited (429)"
             
             response.raise_for_status()
+
+            bad = undecodable_encoding(response.headers)
+            if bad:
+                return None, response.status_code, headers, f"Undecodable Content-Encoding: {bad}"
             
             # Handle encoding
             response.encoding = response.apparent_encoding or 'utf-8'
@@ -454,6 +484,9 @@ class HttpClient:
                         verify=False,
                         allow_redirects=True
                     )
+                bad = undecodable_encoding(response.headers)
+                if bad:
+                    return None, response.status_code, dict(response.headers), f"Undecodable Content-Encoding: {bad}"
                 return response.text, response.status_code, dict(response.headers), None
             except Exception as e2:
                 obs.swallowed("http_client.py:_fetch_with_requests", error_type="http",
