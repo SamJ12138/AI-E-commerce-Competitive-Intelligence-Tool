@@ -44,3 +44,21 @@ robots.txt and Crawl-delay respected, cloudscraper off.
   page and the mugs collection are beyond `max_pages`.
 - Corpus 62/5/9/4 -> 64/3/9/4 (match/partial/mismatch/missing). The end-of-Phase-4 table is kept
   as `docs/real-corpus/scores-phase4.md`.
+
+## Batch 2 - the remaining real-store misses
+
+Store by store from `docs/observations.md` sections 8 to 10. Each fix: a hand-written minimal
+fixture with the page structure the store serves, RED, fix, GREEN. The stores are rerun once at the
+end of the batch.
+
+### allbirds: product-page price from structured data
+
+- The product pages draw their price with JavaScript; the static HTML has it in a JSON-LD
+  `ProductGroup` (`offers.price`) and in `<meta property="product:price:amount">`. The product-page
+  extractor looked only for a visible price block and fell back to `<body>`. When no visible price
+  is found it now reads JSON-LD Product / ProductGroup offers (`price`, an AggregateOffer's
+  `lowPrice`, else the first variant's offer), then the product meta tag. A visible price still
+  wins.
+- RED: `tests/test_product_page_price.py` 4 of 6 failed (price None); the other two are controls.
+  On the four saved allbirds product pages (scratch copies from the ground-truth reading, no new
+  fetch) the extractor now gives 100, 75, 140 and 105, the ground-truth prices.

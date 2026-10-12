@@ -251,6 +251,8 @@ class ProductExtractor:
                 if price_info:
                     break
             container = container.parent
+        if price_info is None:
+            price_info = self._structured_page_price(soup)
 
         product = Product(title=title[:200], url=url, price=price_info)
         product._obs = {'source': 'selector',
@@ -258,6 +260,59 @@ class ProductExtractor:
                                   f"class={container.get('class') if container is not None else None}>; "
                                   f"price {getattr(price_info, '_obs', 'none found')}"}
         return product
+
+    @staticmethod
+    def _structured_page_price(soup: BeautifulSoup) -> Optional[PriceInfo]:
+        """A product page's price when no price is visible in the HTML (drawn by JavaScript):
+        JSON-LD Product / ProductGroup offers (offers.price, an AggregateOffer's lowPrice, else the
+        first variant's offer), then <meta property="product:price:amount">. No compare-at price."""
+        def offer_price(offers):
+            if isinstance(offers, list):
+                offers = offers[0] if offers else {}
+            if not isinstance(offers, dict):
+                return None, None
+            value = offers.get('price', offers.get('lowPrice'))
+            return value, offers.get('priceCurrency')
+
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json.loads(script.string or '')
+            except (ValueError, TypeError):
+                obs.swallowed("product_extractor.py:_structured_page_price", error_type="parse",
+                              fallback="next JSON-LD block", stage="products")
+                continue
+            for item in data if isinstance(data, list) else [data]:
+                if not isinstance(item, dict) or item.get('@type') not in ('Product', 'ProductGroup'):
+                    continue
+                value, currency = offer_price(item.get('offers'))
+                where = 'offers'
+                if value in (None, '') and item.get('hasVariant'):
+                    value, currency = offer_price((item['hasVariant'] or [{}])[0].get('offers'))
+                    where = 'hasVariant[0].offers'
+                try:
+                    amount = float(value)
+                except (TypeError, ValueError):
+                    obs.swallowed("product_extractor.py:_structured_page_price", error_type="parse",
+                                  fallback="next JSON-LD item", stage="products")
+                    continue
+                if amount > 0:
+                    info = PriceInfo(currency=currency or 'USD', current_price=amount)
+                    info._obs = f"JSON-LD {item['@type']} {where} price {amount}"
+                    return info
+
+        meta = soup.find('meta', attrs={'property': 'product:price:amount'})
+        try:
+            amount = float(meta.get('content')) if meta else None
+        except (TypeError, ValueError):
+            obs.swallowed("product_extractor.py:_structured_page_price", error_type="parse",
+                          fallback="no price", stage="products")
+            amount = None
+        if amount:
+            cur = soup.find('meta', attrs={'property': 'product:price:currency'})
+            info = PriceInfo(currency=(cur.get('content') if cur else None) or 'USD', current_price=amount)
+            info._obs = f"meta product:price:amount {amount}"
+            return info
+        return None
 
     def _parse_structured_data_product(
         self,
