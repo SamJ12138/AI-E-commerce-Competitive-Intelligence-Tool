@@ -929,6 +929,11 @@ def main(
     
     Analyzes e-commerce sites and generates Chinese merchant-ready intelligence reports.
     """
+    # A console on a legacy code page (cp1252, gbk, ...) cannot encode every character printed
+    # here (emoji, Chinese under --lang zh): print a replacement instead of stopping the run.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
     obs.init_run()

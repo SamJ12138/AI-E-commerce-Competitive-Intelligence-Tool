@@ -107,3 +107,29 @@ RED: `tests/test_repo_hygiene.py` 6 of 7 failed (36 personal-data hits; no LICEN
 `main.CONFIG_KEYS`; the config file's `timeout: 7` / `max_pages: 3` / `max_products: 4` resolved to
 30 / 20 / 50; no `scrub_paths`); `config.yaml` was already ignored. Tests 258 -> 265. Fixture scores
 17/0/0 on all four runs.
+
+## Batch C - README
+
+- `README.md` rewritten for someone who has never seen the project: what it does and for whom;
+  a quickstart (clone, venv, `pip install -r requirements.txt`, `scripts/demo.py`) in PowerShell
+  and bash that calls the venv's Python directly (no activation, so no execution-policy prompt);
+  real stores and every option; fetching in three sentences plus "Responsible use"; accuracy
+  (fixtures 68/68, the real-store table per field, the Brotli finding); the CSV columns and the two
+  Markdown reports; what "AI" means (only `--ai`) with the pressure-score weights; development;
+  limitations; license.
+- `scripts/demo.py` serves the three fixture stores on 127.0.0.1 (ports 8701-8703 when free),
+  runs `main.py` on them with no delay between requests and a fresh scan history, and prints
+  where the reports are. About 2 seconds.
+- `docs/sample/` (English) and `docs/sample/zh/` (Chinese): the three reports from
+  `scripts/demo.py`, as generated.
+- **Bug found by the first demo run:** on a console whose code page cannot encode the emoji
+  `main.py` prints (here GBK with output piped; also cp1252 or ASCII), the run ended with
+  `UnicodeEncodeError` before the first fetch. Every test harness set `PYTHONIOENCODING=utf-8`, so
+  no test saw it. `main()` now sets `errors="replace"` on stdout and stderr.
+- `tests/test_demo_and_readme.py`: the demo writes the three reports (two `ok`, one `blocked`) and
+  prints their paths; the committed sample exists; every relative link in the README resolves;
+  every `--option` the README names exists; the quickstart runs the demo; `main.py` finishes with
+  `PYTHONIOENCODING` = ascii / gbk / cp1252.
+
+RED: 4 of 6 README/demo tests failed (no demo.py, no sample, quickstart missing); the console test
+failed for all three encodings (`UnicodeEncodeError: ... '\U0001f50d'`). Tests 265 -> 274.

@@ -1,373 +1,244 @@
 # E-commerce Competitive Intelligence Tool
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/AI-Qwen2.5-orange.svg" alt="AI Powered">
-</p>
+Point it at competitor online stores and it writes a structured comparison of what each store
+shows a shopper: prices and discounts, shipping and return terms, promotions (announcement bar,
+email signup, popups, loyalty and referral programs), trust signals (review platform, payment
+methods, tracking pixels), plus a business summary across the stores, in English or Chinese. It is
+for small cross-border and direct-to-consumer sellers who want to see how their own store compares
+with a handful of competitors on Shopify, WooCommerce and similar platforms, without paying for a
+market-research service.
 
-A professional-grade competitive intelligence tool that analyzes e-commerce websites and generates executive-level reports following McKinsey/BCG/Bain consulting frameworks. Built for cross-border sellers and market researchers.
+## Quickstart (no network needed after install)
 
-![Architecture](https://github.com/user-attachments/assets/78c2c453-f8b2-4444-84d8-6c8e35decbc0)
+Requires Python 3.10 or newer and git. This runs the tool on three small stores bundled with the
+repository (served on your own machine), so nothing is sent to any real website.
 
-## Features
-
-**Automated Data Collection**
-- Multi-platform detection (Shopify, WooCommerce, Magento, BigCommerce, Wix, Squarespace)
-- Product catalog and pricing extraction
-- Shipping and return policy analysis
-- Marketing tactics identification (popups, email capture, loyalty programs)
-- Trust signals and payment method detection
-
-**Optional LLM step (`--ai`)**
-- Key insights from a local model served by Ollama (default qwen2.5:7b) - no API costs
-- Labelled AI in the reports only when the model actually produced the text
-
-**Competitive pressure score (rule-based)**
-- A fixed weighted rubric (1-10); the report prints every weight, factor score and input
-
-**Professional Reports**
-- Executive business report (consulting-style)
-- Detailed technical report
-- CSV export for Excel analysis
-- Bilingual support (English/Chinese)
-
-**Change Tracking**
-- Historical scan storage
-- Change detection between scans
-- Trend analysis over time
-
-## Quick Start
-
-### Windows
+PowerShell:
 
 ```powershell
-# Double-click CLICK_TO_RUN.bat or run:
-.\START.ps1 -RenderJS -AI
-```
-
-### macOS / Linux
-
-```bash
-chmod +x START.sh
-./START.sh --render-js --ai
-```
-
-That's it! The tool handles all setup automatically.
-
-## Installation
-
-### Prerequisites
-
-- Python 3.10 or higher
-- 4GB RAM minimum (8GB recommended for AI)
-
-### Manual Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/ecommerce-intel.git
-cd ecommerce-intel
-
-# Create virtual environment
+git clone https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool.git
+cd AI-E-commerce-Competitive-Intelligence-Tool
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or: .\venv\Scripts\Activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run
-python main.py --sites sites.txt --render-js --ai
+venv\Scripts\python -m pip install -r requirements.txt
+venv\Scripts\python scripts\demo.py
 ```
 
-### Enable AI Analysis (Optional)
+bash (Linux, macOS):
 
 ```bash
-# Install Ollama
-# macOS: brew install ollama
-# Linux: curl -fsSL https://ollama.com/install.sh | sh
-# Windows: Download from https://ollama.com/download
-
-# Start Ollama and pull model
-ollama serve &
-ollama pull qwen2.5:7b
+git clone https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool.git
+cd AI-E-commerce-Competitive-Intelligence-Tool
+python3 -m venv venv
+venv/bin/python -m pip install -r requirements.txt
+venv/bin/python scripts/demo.py
 ```
 
-## Usage
+The demo serves a Shopify-style store, a WooCommerce-style store and a store that answers every
+request with a 403 challenge page, runs the tool on all three, and writes three reports to
+`output/demo/`:
 
-### Basic Commands
+- `output/demo/report.md` - one section per store, and a comparison table
+- `output/demo/report.csv` - one row per store, one column per field
+- `output/demo/business_report.md` - a summary across the stores
 
-```bash
-# Analyze sites listed in sites.txt
-python main.py --sites sites.txt
+Add `--lang zh` to the demo command for Chinese reports. The commands call the virtual
+environment's Python directly, so there is no activation step (and no PowerShell execution-policy
+prompt).
 
-# With JavaScript rendering (for dynamic sites)
-python main.py --sites sites.txt --render-js
+## Running on real stores
 
-# With AI analysis
-python main.py --sites sites.txt --ai
+Put the stores in `sites.txt`, one URL per line (lines starting with `#` are comments), then:
 
-# English reports
-python main.py --sites sites.txt --lang en
-
-# Full analysis
-python main.py --sites sites.txt --render-js --ai --lang en
+```powershell
+venv\Scripts\python main.py --sites sites.txt --lang en
 ```
 
-### Command Line Options
+(`venv/bin/python` in bash.) Reports go to `output/` (`--outdir` to change it). The run log goes to
+`logs/`.
 
-| Option | Description |
-|--------|-------------|
-| `--sites`, `-s` | Path to sites.txt file (required) |
-| `--render-js` | Enable JavaScript rendering |
-| `--ai` | Enable AI-powered analysis |
-| `--lang` | Report language: `en` or `zh` |
-| `--outdir`, `-o` | Output directory (default: output) |
-| `--monitor`, `-m` | Enable change detection mode |
-| `--timeout`, `-t` | Request timeout in seconds |
-| `--verbose`, `-v` | Enable verbose logging |
+| option | what it does |
+|---|---|
+| `--lang en` / `--lang zh` | Report language. The default is `zh` (Chinese). |
+| `--render-js` | Load pages in a headless browser so prices and menus drawn by JavaScript are seen. Run `venv\Scripts\python -m playwright install chromium` once first. Slower. |
+| `--ai` | Add text written by a local language model (see below). |
+| `--ai-model` | The Ollama model for `--ai` (default `qwen2.5:7b`). |
+| `--monitor` | Compare each store with its previous scan and report what changed. |
+| `--max-pages`, `--max-products` | Pages read and products collected per store (defaults 20 and 50). |
+| `--timeout` | Seconds to wait for one response (default 30). |
+| `--config` | A settings file; copy `config.example.yaml` to `config.yaml`, which documents every key. |
+| `--ignore-robots` | Ignore robots.txt rules and Crawl-delay. Only for sites you own or have permission to crawl. |
+| `--verbose` | Debug logging. |
 
-### Sites File Format
+**`--ai` (optional).** Install [Ollama](https://ollama.com), run `ollama pull qwen2.5:7b`, and
+add `--ai`. For every store that was read, the local model writes key insights, recommendations
+and a brand-positioning paragraph; they appear in `report.md` under headings marked "(AI)". The
+model's text is in Chinese whatever `--lang` says. Nothing is sent to a cloud service. Without
+`--ai`, or when Ollama is not running (a warning says so), all text is rule-based and the
+business report says the LLM step did not run.
 
-Create a `sites.txt` file with URLs to analyze:
+**Monitor mode and change detection.** Every scan is stored in `data/intel_cache.db`. With
+`--monitor`, each store is compared with the newest earlier scan of the same store and `report.md`
+lists what changed: lowest and highest price, announcement bar text, featured products added or
+removed, categories, free-shipping threshold and return window. A store that was blocked on either
+scan is not compared. Run the same command on a schedule (Task Scheduler, cron) to track
+competitors over time.
 
-```
-# E-commerce sites to analyze
-https://www.aloyoga.com
-https://www.allbirds.com
-https://www.glossier.com
-https://www.warbyparker.com
-```
+## How fetching works
+
+Each page is requested with browser-like headers (a desktop Chrome User-Agent); if the server
+answers 403 or 429, the same URL is asked once more with a User-Agent that names this tool and
+links to this repository, and after a further 403 the tool falls back to cloudscraper, which can
+answer Cloudflare's JavaScript challenge; with `--render-js` pages are loaded in a headless browser
+instead, with cloudscraper as its fallback. robots.txt rules and Crawl-delay are respected unless
+`--ignore-robots` is passed, and by default the tool waits 1.5 seconds between requests to the same
+host. A
+store that refuses every attempt is reported as blocked, with the steps tried, and none of its
+fields are guessed. Every step and when a store ends as blocked or unreachable:
+[docs/fetching.md](docs/fetching.md).
+
+**Responsible use.** Check each site's terms of service before you scan it; some forbid automated
+access whatever their robots.txt says. Keep the delays: do not lower `rate_limit_delay` or pass
+`--ignore-robots` for sites that are not yours. Scan competitors for your own analysis; do not use
+the tool to collect data for resale. You are responsible for how you use it.
+
+## Accuracy
+
+**Fixture stores.** Three hand-written stores in `tests/fixtures/stores/`, each with the true value
+of every field in its `fixtures.json`. Four runs (the Shopify-style store, the WooCommerce-style
+store, the blocked store, and the blocked store with `--render-js`), 17 fields each: 68 of 68
+match, checked on every commit. The fixtures were written alongside the extractors, so this shows
+the code does what the tests describe, not how it does on real stores.
+
+**Real stores.** Eight public stores (five Shopify, two WooCommerce, one Magento store behind a
+Cloudflare challenge), with the true values read by hand from their pages and the source URL of
+every fact in [docs/real-corpus/](docs/real-corpus/README.md). One run per store, default settings,
+cloudscraper switched off. Per field, out of 8 stores
+([docs/real-corpus/scores.md](docs/real-corpus/scores.md)):
+
+| field | match | partial | mismatch | missing |
+|---|---|---|---|---|
+| status (ok / blocked) | 8 | 0 | 0 | 0 |
+| platform | 8 | 0 | 0 | 0 |
+| products (price and compare-at price of 4 known products) | 4 | 3 | 0 | 1 |
+| free-shipping threshold | 7 | 0 | 0 | 1 |
+| return window (days) | 6 | 0 | 0 | 2 |
+| free returns | 4 | 0 | 4 | 0 |
+| payment methods | 6 | 2 | 0 | 0 |
+| review platform | 8 | 0 | 0 | 0 |
+| loyalty program | 5 | 0 | 3 | 0 |
+| email capture | 6 | 0 | 2 | 0 |
+| **total (80)** | **62** | **5** | **9** | **4** |
+
+"Missing" means the store states a value and the tool reported none; "mismatch" means the tool
+reported a wrong value, including a definite answer where the store states nothing. The blocked
+Magento store counts as a match on every field when the tool reports it as blocked with every field
+unknown. The remaining misses are listed one by one in
+[docs/observations.md](docs/observations.md) (sections 8 and 9).
+
+**Why there is a real-store corpus.** When it was first run, six of the eight real stores came
+back empty: they answered with Brotli-compressed pages, the tool asked for Brotli without a decoder
+installed, and parsed the compressed bytes as HTML. Every fixture test passed at the time, because
+the fixture server does not compress. The first real-store score was 36 match, 8 mismatch, 36
+missing out of 80 ([docs/real-corpus/scores-baseline.md](docs/real-corpus/scores-baseline.md)).
 
 ## Output
 
-### Generated Reports
+`report.csv` has one row per store:
 
-| File | Description |
-|------|-------------|
-| `output/business_report.md` | Executive-level competitive analysis |
-| `output/report.md` | Detailed technical report |
-| `output/report.csv` | Data export for Excel |
+| column | content |
+|---|---|
+| `domain`, `url` | the store |
+| `status`, `fetch_attempts` | `ok`, `blocked` or `unreachable`; for a store that was not read, the steps tried and their status codes |
+| `platform` | Shopify, WooCommerce, Magento, BigCommerce, PrestaShop, Squarespace, Wix or Custom/Unknown |
+| `brand_positioning` | the store's own description of itself, quoted (meta description, title tagline or hero headline) |
+| `categories` | categories from the navigation |
+| `price_min`, `price_max`, `price_median`, `currency` | over the products read |
+| `has_discounts` | a product shows a compare-at (struck-through) price |
+| `announcement_bar` | the text of the bar at the top of the page |
+| `has_popup`, `has_email_capture`, `has_loyalty`, `has_referral` | marketing features found |
+| `free_shipping_threshold`, `return_days`, `free_returns` | shipping and return terms |
+| `review_platform`, `review_count` | the review app (Yotpo, Judge.me, ...) and the number of reviews shown |
+| `payment_methods` | cards, wallets and buy-now-pay-later services named or declared on the pages |
+| `pixels_detected` | analytics and ad pixels (Google Analytics, Meta Pixel, ...) |
+| `scan_timestamp` | when the store was scanned |
 
-### Business Report Structure
+Empty cells mean unknown. For a blocked or unreachable store every field is empty.
 
-```
-1. Executive Summary
-   - Key findings
-   - Platform landscape
-   - Pricing insights
-   - Changes detected
+`report.md` has one section per store (insights, recommendations, the pressure score with its
+factors, where each value came from, which policy pages were read, changes since the last scan,
+featured products) and a comparison table. `business_report.md` summarises across the stores:
+platforms, price ranges, shipping and return terms, a feature matrix, what the data shows,
+what to compare against, and how the data was collected.
 
-2. Market Overview
-   - Industry landscape
-   - Platform distribution
-   - Pricing tiers
+Reports produced by `scripts/demo.py` from the fixture stores: [docs/sample/](docs/sample/report.md)
+(English) and [docs/sample/zh/](docs/sample/zh/report.md) (Chinese).
 
-3. Competitor Profiles
-   - Website & platform
-   - Scan history
-   - Key metrics
-   - AI insights
-   - Changes since last scan
+## What "AI" means here
 
-4. Comparative Analysis
-   - Feature comparison matrix
+Only the optional `--ai` step uses a model: a language model running locally under Ollama writes
+insight and recommendation text. Everything else is rules: regular expressions, HTML selectors and
+fixed thresholds.
 
-5. SWOT Analysis
-   - Opportunities
-   - Threats
+The competitive pressure score in `report.md` is a fixed rubric, not a model. Each of six factors
+gets 0 to 10 by a fixed rule, and the score is the weighted sum rounded and clamped to 1-10.
+`report.md` prints every factor's inputs, rule and score.
 
-6. Strategic Recommendations
-   - Immediate actions (0-3 months)
-   - Short-term initiatives (3-6 months)
-   - Long-term strategy (6-12 months)
+| factor | weight | rule (summary) |
+|---|---|---|
+| platform maturity | 0.15 | Shopify 9, BigCommerce 8, WooCommerce / Magento 7, Squarespace 6, Wix 5, unknown 4 |
+| price competitiveness | 0.20 | median price under $25: 9, under $50: 7, under $100: 5, otherwise 3 |
+| marketing tactics | 0.20 | 1, plus popup 2, email capture 2, loyalty 2, referral 2, announcement bar 1 |
+| trust signals | 0.15 | 1, plus review platform 3, reviews over 100: 2 (any: 1), buy-now-pay-later 2, 3+ payment methods 1 |
+| shipping offer | 0.15 | free shipping on everything 9, threshold under $50: 7, under $100: 5, otherwise 3 |
+| brand signals | 0.15 | 5, plus more than 500 reviews 2, loyalty 1, 3+ categories 1 |
 
-7. Appendix
-   - Methodology
-   - Data quality notes
-```
+An unknown input scores 5 for price and shipping and counts as absent elsewhere.
 
-### Sample Output
+## Development
 
-```markdown
-## Executive Summary
-
-**Platform Landscape:** 17 of 25 competitors (68%) use Shopify.
-
-**Pricing:** Average price range is $45-$125. Market spans $5 to $350.
-
-**Shipping:** 48% of competitors offer free shipping.
-
----
-
-## Competitor Profiles
-
-### aloyoga.com
-
-**Website:** https://www.aloyoga.com | **Platform:** Shopify
-
-**Scan History:** 3 scans (First: 2026-01-10, Latest: 2026-01-13)
-
-**Key Metrics:**
-- **Price Range:** $78 - $195 (Median: $136)
-- **Shipping:** Free shipping on all orders
-- **Returns:** 30 days (free)
-- **Marketing:** Popup, Email Capture, Loyalty Program
+```powershell
+venv\Scripts\python -m pip install pytest
+venv\Scripts\python -m pytest -q
 ```
 
-## Legal Compliance
+- **Tests** (`tests/`, about a minute) run against local servers only; no test touches the
+  internet. The fixture run with `--render-js` runs only with `ECI_TEST_RENDER_JS=1` (it needs
+  `playwright install chromium`).
+- **Fixture stores**: `tests/fixtures/stores/<store>/` holds the pages and `fixtures.json` the true
+  values; `python tests/fixtures/stores/server.py` serves all three on 127.0.0.1.
+- **`scripts/score_fixtures.py`** runs `main.py` on each fixture store and scores every field
+  against `fixtures.json`, with the rule that produced each value. The test suite fails if any
+  field stops matching.
+- **`scripts/real_corpus.py`** (`run` / `score`) runs the tool once per real store and scores it
+  against `docs/real-corpus/<store>.json`. `run` visits real websites; see
+  [docs/real-corpus/README.md](docs/real-corpus/README.md) for how the ground truth is read (by
+  hand, before the tool's output for that store is looked at).
+- **Run log**: every run writes `logs/run_<id>.jsonl`, one JSON event per stage, fetch and field,
+  including the rule or selector that produced each value and every exception that was handled.
+  `python scripts/failure_report.py` summarises the newest log.
+- **Pre-commit hook**: `python scripts/install-hooks.py` installs a hook that runs the full test
+  suite and refuses the commit if a test fails. CI runs the same suite on Ubuntu and Windows
+  (`.github/workflows/ci.yml`).
+- Change history and findings: [docs/phase2.md](docs/phase2.md), [docs/phase3.md](docs/phase3.md),
+  [docs/phase4.md](docs/phase4.md), [docs/observations.md](docs/observations.md).
 
-This tool respects website crawling policies through a **Policy Evidence Ladder**:
+## Limitations
 
-| Level | Source | Confidence |
-|-------|--------|------------|
-| ✅ Level 1 | Official policy pages | High |
-| ✅ Level 2 | FAQ/Help center | High |
-| ⚠️ Level 3 | Product/cart inference | Medium |
-| ❌ Level 4 | Blocked by robots.txt | Manual verification needed |
-
-- Respects `robots.txt` by default
-- Tracks data source for each extracted value
-- Flags items requiring manual verification
-- No bypassing of crawl restrictions
-
-## Architecture
-
-```
-ecommerce-intel/
-├── main.py                 # Main entry point
-├── modules/
-│   ├── http_client.py      # HTTP client with anti-bot bypass
-│   ├── platform_detector.py # E-commerce platform detection
-│   ├── product_extractor.py # Product/price extraction
-│   ├── policy_extractor.py  # Shipping/returns extraction
-│   ├── policy_evidence.py   # Evidence ladder system
-│   ├── ai_analyzer.py       # AI-powered analysis
-│   ├── business_report.py   # Executive report generator
-│   ├── report_writer.py     # Technical report generator
-│   ├── snapshot_store.py    # SQLite storage for history
-│   └── ...
-├── data/
-│   └── intel_cache.db      # Scan history database
-├── output/
-│   ├── business_report.md  # Executive report
-│   ├── report.md           # Technical report
-│   └── report.csv          # CSV export
-└── sites.txt               # URLs to analyze
-```
-
-## Anti-Bot Technology
-
-The tool includes advanced anti-bot bypass capabilities:
-
-- **Patchright** - Patched Playwright that bypasses Cloudflare, DataDome
-- **Cloudscraper** - Cloudflare challenge solver
-- **Stealth Mode** - Real browser fingerprinting
-
-Most e-commerce sites work out of the box. Sites with enterprise-level protection may require manual verification.
-
-## Change Tracking
-
-The tool maintains a SQLite database of all scans, enabling:
-
-```
-✓ Completed: aloyoga.com
-  📊 Scan #3 for aloyoga.com
-
-Changes Since Last Scan:
-- Price range changed from $78-$195 to $75-$198
-- Free shipping threshold changed from $100 to $75
-```
-
-To preserve scan history when upgrading, copy `data/intel_cache.db` to the new version.
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Optional: Custom Ollama endpoint
-export OLLAMA_HOST=http://localhost:11434
-```
-
-### Config File (Optional)
-
-Create `config.yaml`:
-
-```yaml
-render_js: true
-timeout: 30
-max_products: 50
-max_pages: 20
-db_path: data/intel_cache.db
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**"Ollama not found"**
-```bash
-# Install Ollama
-brew install ollama  # macOS
-# or download from https://ollama.com/download
-```
-
-**"Playwright not installed"**
-```bash
-pip install patchright
-patchright install chrome
-```
-
-**"SSL Certificate Error"**
-- The tool automatically handles SSL errors
-- Some sites may require manual verification
-
-**"403 Forbidden"**
-- Site has bot protection
-- Tool will try fallback methods automatically
-- Check `business_report.md` for manual verification notes
-
-### Debug Mode
-
-```bash
-python main.py --sites sites.txt --verbose
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- Without `--render-js` only the HTML the server sends is read; stores that draw prices with
+  JavaScript report no products (one of the eight real stores).
+- Each store is sampled: at most 20 pages and 50 products by default. The products reported are a
+  sample, not the catalogue.
+- Extraction is pattern-based and written for English-language pages. A phrasing the patterns do
+  not know is missed (one store's "full refund up to 120 days"), and some yes/no fields read
+  silence as "no" (free returns) or match unrelated text (a privacy notice mentioning loyalty
+  programs, an account-registration email field).
+- Price rules in the pressure score assume US dollars.
+- Stores behind strong bot protection end as blocked. The tool does not log in, add to cart or
+  check out.
+- A store skipped because of robots.txt is not in the reports (the console and the run log say
+  why).
+- The `--ai` text is always in Chinese and needs a local Ollama install.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Patchright](https://github.com/AhmedSakrr/patchright-python) - Anti-bot browser automation
-- [Ollama](https://ollama.com/) - Local AI inference
-- [Qwen2.5](https://huggingface.co/Qwen) - AI model for analysis
-- Consulting frameworks inspired by McKinsey, BCG, and Bain methodologies
-
-## Disclaimer
-
-This tool is designed for legitimate competitive research purposes. Users are responsible for:
-- Complying with websites' Terms of Service
-- Respecting robots.txt directives
-- Using extracted data ethically and legally
-
-The tool respects robots.txt by default and does not bypass access restrictions.
-
----
-
-<p align="center">
-  Made with ❤️ for cross-border sellers
-</p>
+MIT, see [LICENSE](LICENSE). [NOTICE.md](NOTICE.md) covers trademarks and fixtures.
