@@ -511,3 +511,28 @@ From `docs/sample/real/allbirds/` (one scan, 2026-10-12, 10 of 10 on the corpus 
   Sources": `/pages/returns-exchanges` is neither `/policies/` nor FAQ/help, so it gets evidence
   level 3, whose label is "product/cart". The value (30 days, customer pays return shipping) is
   right.
+
+## 13. Phase 6: what is left after the four items
+
+From `docs/real-corpus/scores.md` (Phase 6 runs, 2026-10-12). Resolved from section 11:
+barefootbuttons' products (sample top-up), beardbrand's products (link cards), porterandyork's
+free returns (its returns page answered this time), and has_popup, now scored (it was True on every
+saved homepage). The homepage price fallback is gone (Phase 5 Batch 4's open question).
+
+- **has_popup is unknown on five of seven real stores.** allbirds, beardbrand, deathwishcoffee,
+  porterandyork and rastaclat have no marketing popup in their HTML but load Klaviyo's onsite
+  script, Attentive or Postscript, which draw popups in the browser on their own triggers (delay,
+  scroll, exit). The tool reports None for them, and the ground truth agrees; `--render-js` waits a
+  fixed 3 s and does not trigger exit intent, so it would not settle them either.
+- **brooklinen has_popup missing in its scored run** (`--render-js`): the rendered `<body>` carries
+  `swym-loading`, which the functional-overlay filter read as an ancestor of the exit overlay. Fixed
+  after the run; a replay of the run's rendered pages gives True. Not re-run.
+- **beardbrand: a review count runs into the price.** The Utility Beard Trimmer's product page price
+  block reads "$124.95" and "35 reviews" as one string, "$124.9535 reviews", so the price (and
+  price_max) is 124.9535. Within the scorer's 0.005 tolerance, so it scores as a match; the reports
+  print $124.9535 or round it. Not fixed (outside the four items); same in the run before.
+- **brooklinen: Down Pillow sampled in one run and not in the next** (item 2's `--render-js` run had
+  it at $118 / $139; item 3's did not). The rendered collection pages differ between visits.
+- Unchanged and still open: brooklinen's rendered 15% off vs the ground truth, rastaclat's Klarna,
+  beardbrand's Alliance loyalty, and section 12's three sample findings.
+

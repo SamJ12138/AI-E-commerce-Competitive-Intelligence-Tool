@@ -68,8 +68,8 @@ range, threshold, return window and the 50 sampled products with their prices) a
 a later change-detection check; the second scan has not been run.
 
 `scores.md` is the current table; `scores-baseline.md` (before any fix),
-`scores-after-batch4.md` (pfrankmd still in the corpus) and `scores-phase4.md` (end of Phase 4) are
-kept as history.
+`scores-after-batch4.md` (pfrankmd still in the corpus), `scores-phase4.md` (end of Phase 4) and
+`scores-phase5.md` (end of Phase 5, before has_popup was scored) are kept as history.
 
 `run` uses default settings except that the cloudscraper fallback is switched off (real-site runs
 never take the cloudscraper path), so a 403 ends on `requests 403`. `score` writes per store and

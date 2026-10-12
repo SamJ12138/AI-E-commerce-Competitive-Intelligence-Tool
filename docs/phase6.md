@@ -188,3 +188,27 @@ Six with default settings, brooklinen with `--render-js` as its scored run (same
   Utility Beard Trimmer's product-page price block reads "$124.95" and "35 reviews" as one string
   ("$124.9535 reviews"). It was the same in item 3's run; the scorer's tolerance counts it as the
   ground truth's $124.95.
+
+## Scores
+
+`docs/real-corpus/scores.md` (the end-of-Phase-5 table is kept as `scores-phase5.md`).
+
+| store | end of Phase 5 (10 fields) | Phase 6 (11 fields, with has_popup) | run |
+|---|---|---|---|
+| allbirds | 10/0/0/0 | 11/0/0/0 | item 3 |
+| barefootbuttons | 9/1/0/0 | 11/0/0/0 | item 3 (item 1's run: 10/0/0/0 on 10 fields) |
+| beardbrand | 8/1/1/0 | 10/0/1/0 | item 4 |
+| brooklinen | 9/0/1/0 | 9/0/1/1 | item 3, `--render-js` |
+| deathwishcoffee | 10/0/0/0 | 11/0/0/0 | item 3 |
+| louboutin | 10/0/0/0 | 11/0/0/0 | Phase 3 Batch 4 (blocked) |
+| porterandyork | 9/0/0/1 | 11/0/0/0 | item 3 |
+| rastaclat | 9/1/0/0 | 10/1/0/0 | item 3 |
+| **total** | **74/3/2/1** | **84/1/2/1** | |
+
+(match/partial/mismatch/missing.) On the ten fields of Phase 5: 77/1/2/0. has_popup: 7 match, 1
+missing (brooklinen, fixed after the run; see item 3). What is left is in `docs/observations.md`
+section 13.
+
+Real-site visits in this phase: barefootbuttons 2 (items 1 and 3), brooklinen 2 (items 2 and 3,
+both `--render-js`), beardbrand 2 (items 3 and 4), allbirds, deathwishcoffee, porterandyork and
+rastaclat 1 each (item 3); louboutin none.

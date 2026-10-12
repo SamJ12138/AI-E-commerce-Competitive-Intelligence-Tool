@@ -128,22 +128,24 @@ Per field, out of 8 stores
 |---|---|---|---|---|
 | status (ok / blocked) | 8 | 0 | 0 | 0 |
 | platform | 8 | 0 | 0 | 0 |
-| products (price and compare-at price of 4 known products) | 5 | 2 | 1 | 0 |
+| products (price and compare-at price of 4 known products) | 7 | 0 | 1 | 0 |
 | free-shipping threshold | 8 | 0 | 0 | 0 |
 | return window (days) | 8 | 0 | 0 | 0 |
-| free returns | 7 | 0 | 0 | 1 |
+| free returns | 8 | 0 | 0 | 0 |
 | payment methods | 7 | 1 | 0 | 0 |
 | review platform | 8 | 0 | 0 | 0 |
 | loyalty program | 7 | 0 | 1 | 0 |
 | email capture | 8 | 0 | 0 | 0 |
-| **total (80)** | **74** | **3** | **2** | **1** |
+| marketing popup (unknown on 5 stores: drawn by a script) | 7 | 0 | 0 | 1 |
+| **total (88)** | **84** | **1** | **2** | **1** |
 
 "Missing" means the store states a value and the tool reported none; "mismatch" means the tool
 reported a wrong value, including a definite answer where the store states nothing. The blocked
 Magento store counts as a match on every field when the tool reports it as blocked with every field
 unknown. The remaining misses are listed one by one in
-[docs/observations.md](docs/observations.md) (sections 8 to 11); two of them are disagreements between
-the ground truth and the store's pages, left for a decision ([docs/phase5.md](docs/phase5.md)).
+[docs/observations.md](docs/observations.md) (sections 8 to 13); two of them are disagreements between
+the ground truth and the store's pages, left for a decision ([docs/phase5.md](docs/phase5.md)). The
+popup miss (brooklinen) was fixed after its run ([docs/phase6.md](docs/phase6.md)).
 
 **Why there is a real-store corpus.** When it was first run, six of the eight real stores came
 back empty: they answered with Brotli-compressed pages, the tool asked for Brotli without a decoder
