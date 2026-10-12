@@ -134,12 +134,42 @@ RED: `tests/test_repo_hygiene.py` 6 of 7 failed (36 personal-data hits; no LICEN
 RED: 4 of 6 README/demo tests failed (no demo.py, no sample, quickstart missing); the console test
 failed for all three encodings (`UnicodeEncodeError: ... '\U0001f50d'`). Tests 265 -> 274.
 
-## Batch D - stopped: the repository has a fork
+## Batch D - the public history replaced
 
-`gh repo view`: forkCount 1, stargazerCount 3. The fork is `shhnn/-123` (public, created
-2026-03-28, no pushes of its own since it was made). The remote also has a tag `updates`
-(9182567, in the old history) besides `main`. Per the brief, nothing was pushed, no backup bundle
-or new history was built; waiting for the owner.
+- First check: `gh repo view` showed forkCount 1, stargazerCount 3. The fork is `shhnn/-123`
+  (public, created 2026-03-28, no pushes of its own). The run stopped there as the brief said; the
+  owner chose to go ahead: force-push, delete the tag `updates` (9182567, old history), leave the
+  fork owner alone. The fork keeps the old history; that is outside this repository's control.
+- A backup bundle of the public `main` and `updates` was made and verified first, and deleted once
+  CI was green.
+- New history (built with `git commit-tree`, no rebase): the root commit has the tree of 1e027ae;
+  the 21 later commits follow in order with their messages byte for byte; author and committer
+  `Tianyi Jia <186099051+SamJ12138@users.noreply.github.com>`, original dates kept. The four run
+  logs in `docs/baseline/logs/` carried local paths from 9dd299b until 729f480 scrubbed them; in
+  the new history they are scrubbed in every commit (`scrub_paths`, the same replacement). The final
+  tree is identical to the local branch's. No archive appears in any commit. The personal-data
+  sweep over `git log -p` of the new history: 0 hits.
+- Force-pushed to `main` (88111df -> 3e7ab53); tag `updates` deleted; no other remote branches.
+  Description and topics (ecommerce, competitive-analysis, shopify, woocommerce,
+  cross-border-ecommerce, python) set with `gh repo edit`.
+- Issue #1 ("architecture") is left open: its body is only the image the old README showed as its
+  architecture diagram; it asks for nothing.
+- CI on the push: both jobs green on the first run, 274 passed on ubuntu-24.04 and on
+  windows-2025 (Python 3.12).
+
+## Batch E - fresh clone of the public repository
+
+Each run: `git clone` of the public URL into a new temp folder, then the README's PowerShell
+quickstart word for word.
+
+| run | clone | venv | pip install | demo | total | README edits |
+|---|---|---|---|---|---|---|
+| 1 | 0.7 s | 3.2 s | 9.8 s (pip cache warm) | 4.0 s | 17.7 s | none needed |
+| 2 | 0.7 s | 3.3 s | 19.1 s (`PIP_NO_CACHE_DIR=1`: all 69 packages downloaded) | 2.8 s | 25.9 s | none |
+
+Both runs wrote `report.md`, `report.csv` and `business_report.md` to `output/demo/`. In the
+public clone, `git log -p --all` has 0 personal-data hits, one author identity (the noreply
+address) and no tags.
 
 ## Batch E rehearsal (local, before any push)
 
