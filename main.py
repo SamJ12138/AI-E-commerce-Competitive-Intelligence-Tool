@@ -628,15 +628,14 @@ def analyze_site(
     # Step 7: Discover and analyze additional pages
     update_progress("Discovering pages...")
     t = obs.begin("discovery")
-    pages = discover_pages(url, client, robots_checker, config)
+    pages = discover_pages(url, client, robots_checker, config, platform=intel.platform, homepage_soup=soup)
     obs.end("discovery", t, pages=len(pages))
 
     all_products = []
     t_products = obs.begin("products")
     
-    # For Shopify sites, ensure we try /collections/all and /products.json
+    # For Shopify sites, try the /products.json API (every product with its compare-at price)
     if intel.platform == Platform.SHOPIFY:
-        from modules.url_utils import normalize_url
         from urllib.parse import urljoin
         
         # Try to fetch products.json API endpoint
@@ -670,12 +669,6 @@ def analyze_site(
                           url=products_json_url)
             logger.debug(f"Could not fetch products.json: {e}")
         
-        # Ensure /collections/all is in the pages list
-        collections_all = normalize_url(urljoin(url, '/collections/all'))
-        if not any(p[0] == collections_all for p in pages):
-            pages.insert(1, (collections_all, 'collection'))
-            obs.event("discovery", "success", kind="collections_all_inserted", url=collections_all)
-    
     # Analyze discovered pages
     for page_url, page_type in pages[:config.max_pages]:
         if page_url == url:  # Skip homepage, already processed

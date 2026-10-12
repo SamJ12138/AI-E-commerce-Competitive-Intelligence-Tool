@@ -32,3 +32,36 @@ One section per batch, in commit order. Fixture scores are re-measured after eve
 - Not exercised here: no Ollama in this environment. The analyzer contract is tested with a stubbed
   `OllamaClient` (`tests/test_ai_labels.py`).
 - Fixture scores unchanged (shopify 12/1/3, woo 9/1/6, blocked 10/0/6).
+
+## Batch 2 - fetch the pages that matter
+
+- Discovery now starts from the links on the homepage that `analyze_site` already fetched (no
+  third homepage request). Collection, product and policy links are kept, query strings dropped,
+  robots.txt checked per URL; cart / checkout / account / add-to-cart links are never followed.
+- Guessed paths are platform-known only and only for the page kinds the crawl did not find:
+  Shopify `/collections/all`, `/policies/shipping-policy`, `/policies/refund-policy`;
+  WooCommerce `/shop`, `/refund_returns`. Nothing is guessed for other platforms. The 22-path
+  `get_priority_pages()` list is deleted, and so is main.py's unconditional `/collections/all`
+  insertion.
+- Sitemaps are read only when no product page was found: those declared in robots.txt, else the
+  platform's own location (Shopify `/sitemap.xml`, WordPress `/wp-sitemap.xml`).
+  `RobotsChecker.get_sitemaps()` no longer guesses `/sitemap.xml` and `/sitemap_index.xml`.
+- `categorize_page_type()` recognises `/shop`, `/collections`, `/catalog`, `/categories` without a
+  trailing segment and `/product-category/...`.
+- Inside `max_pages` (the homepage counts as one) pages are ordered collections, shipping/returns
+  policies, products, other policies, so a long product list cannot push the policies out.
+- Shopify `/products.json` is still requested (a platform API, not a page guess); it is the one 404
+  left on the fixture.
+
+| store | requests | 404s | wall time |
+|---|---|---|---|
+| shopify_basic before | 26 | 20 (16 guessed paths, 3 guessed sitemaps, products.json) | 38.0 s |
+| shopify_basic after | 9 | 1 (products.json) | 11.5 s |
+| woocommerce_promo before | 25 | 21 (18 guessed paths, 3 guessed sitemaps) | 36.6 s |
+| woocommerce_promo after | 8 | 0 | 10.0 s |
+
+Every page listed in each store's fixtures.json is now fetched (before: no product page on either
+store, neither WooCommerce policy page). woocommerce_promo `free_returns` now matches (False, from
+`/refund_returns`); its `return_days` is still null because no return-days pattern matches "lasts
+14 days" (fixed in Batch 3). Still one redundant request per site: the homepage is fetched a second
+time only to read response headers for platform detection (`main.py`, platform stage).

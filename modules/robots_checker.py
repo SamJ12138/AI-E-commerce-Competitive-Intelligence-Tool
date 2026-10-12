@@ -179,14 +179,8 @@ class RobotsChecker:
         
         if parser is None:
             obs.degraded("robots_checker.py:get_sitemaps", "parse", "no parsed robots.txt",
-                         fallback="guess /sitemap.xml and /sitemap_index.xml", stage="discovery", url=url)
-            # Try common sitemap locations
-            parsed = urlparse(url)
-            base = f"{parsed.scheme}://{parsed.netloc}"
-            return [
-                f"{base}/sitemap.xml",
-                f"{base}/sitemap_index.xml",
-            ]
+                         fallback="no declared sitemaps", stage="discovery", url=url)
+            return []
         
         try:
             sitemaps = parser.sitemaps or []

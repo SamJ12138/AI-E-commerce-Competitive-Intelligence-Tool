@@ -263,13 +263,15 @@ def categorize_page_type(url: str) -> str:
         if re.search(pattern, path):
             return 'product'
     
-    # Collection/category pages
+    # Collection/category pages (with or without a trailing segment: /shop, /collections/all)
     collection_patterns = [
-        r'/collections?/',
-        r'/categories?/',
+        r'/collections?(/|$)',
+        r'/categories?(/|$)',
+        r'/product-category/',
         r'/c/',
-        r'/shop/',
-        r'/catalog/',
+        r'/shop(/|$)',
+        r'/catalog(/|$)',
+        r'^/products$',
     ]
     for pattern in collection_patterns:
         if re.search(pattern, path):
@@ -313,54 +315,6 @@ def categorize_page_type(url: str) -> str:
     return 'other'
 
 
-def get_priority_pages(base_url: str) -> List[Tuple[str, str]]:
-    """
-    Get a prioritized list of pages to crawl for an e-commerce site.
-    
-    Args:
-        base_url: The site's base URL
-        
-    Returns:
-        List of (url, page_type) tuples in priority order
-    """
-    # Common e-commerce page paths to check
-    paths = [
-        ('/', 'home'),
-        ('/collections', 'collection'),
-        ('/collections/all', 'collection'),
-        ('/products', 'collection'),
-        ('/shop', 'collection'),
-        ('/catalog', 'collection'),
-        ('/pages/about', 'about'),
-        ('/pages/about-us', 'about'),
-        ('/about', 'about'),
-        ('/about-us', 'about'),
-        ('/policies/shipping-policy', 'policy'),
-        ('/pages/shipping', 'policy'),
-        ('/shipping', 'policy'),
-        ('/policies/refund-policy', 'policy'),
-        ('/pages/returns', 'policy'),
-        ('/returns', 'policy'),
-        ('/pages/return-policy', 'policy'),
-        ('/policies/privacy-policy', 'policy'),
-        ('/pages/faq', 'policy'),
-        ('/faq', 'policy'),
-        ('/pages/contact', 'contact'),
-        ('/contact', 'contact'),
-    ]
-    
-    result = []
-    seen = set()
-    
-    for path, page_type in paths:
-        url = normalize_url(urljoin(base_url, path))
-        if url not in seen:
-            seen.add(url)
-            result.append((url, page_type))
-    
-    return result
-
-
 def extract_links_from_soup(soup, base_url: str) -> List[Tuple[str, str]]:
     """
     Extract all internal links from a BeautifulSoup object.
@@ -384,7 +338,8 @@ def extract_links_from_soup(soup, base_url: str) -> List[Tuple[str, str]]:
         # Skip common non-content links
         skip_patterns = [
             '/cart', '/checkout', '/account', '/login', '/register',
-            '/wishlist', '/compare', '/search', '.pdf', '.jpg', '.png'
+            '/wishlist', '/compare', '/search', '.pdf', '.jpg', '.png',
+            'add-to-cart', 'add_to_cart'
         ]
         if any(pattern in href.lower() for pattern in skip_patterns):
             continue
