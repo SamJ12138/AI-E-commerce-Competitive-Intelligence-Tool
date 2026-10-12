@@ -111,3 +111,13 @@ end of the batch.
 - RED: `tests/test_policy_phrasing.py` 8 of 11 failed (three are unchanged controls). On the saved
   pages: brooklinen's returns page 365 days, beardbrand's returns page 120 days and FAQ $100; the
   other stores' pages give the same values as before.
+
+### brooklinen: a link to the rewards page is a loyalty program
+
+- brooklinen links `/pages/rewards` from its account menu (an icon) and its footer ("Brooklinen
+  Rewards"); the homepage has no other loyalty wording and the rewards page itself is not crawled
+  (category `other`). A link whose path has a `rewards` / `loyalty` segment (`/pages/rewards`,
+  `/pages/ritual-rewards`, `/account/loyalty`) now counts; product, collection, shop and blog paths
+  do not (brooklinen's homepage also links products named `rewards-...`).
+- RED: `tests/test_loyalty_link.py` 4 of 8 failed (the four non-program links are controls). On the
+  saved homepages only brooklinen changes (False -> True).

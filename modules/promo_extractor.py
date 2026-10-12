@@ -14,6 +14,7 @@ import copy
 import re
 import logging
 from typing import List, Dict, Optional, Tuple
+from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
 from .models import Promotion, AnalyticsPixel
@@ -35,6 +36,10 @@ def _text_without_controls(elem) -> str:
 # hidden modal): their wording ("loyalty programs", "refer a friend") describes the policy, not an
 # offer. Matched on id and class names; <html>, <body> and <main> are never dropped.
 LEGAL_BLOCK = re.compile(r'privacy|terms|cookie|consent|gdpr', re.I)
+
+# First path segments of catalogue and blog pages: a "rewards" in them names a product or a post.
+NOT_PROGRAM_PATHS = {'products', 'product', 'collections', 'collection', 'product-category', 'shop',
+                     'blogs', 'blog', 'news'}
 
 
 def _text_without_legal_blocks(soup) -> str:
@@ -410,6 +415,15 @@ class PromoExtractor:
             if match:
                 obs.note('has_loyalty', True, 'regex', f"LOYALTY_PATTERNS {pattern!r} matched {match.group(0)!r}",
                          snippet=obs.snippet(text_lower, match.group(0)))
+                return True
+
+        # A link to the store's own rewards / loyalty page (brooklinen: "/pages/rewards" from the
+        # account menu and the footer); catalogue and blog paths that merely contain the word are not.
+        for a in soup.find_all('a', href=True):
+            segments = [s for s in urlsplit(a['href']).path.lower().split('/') if s]
+            if segments and segments[0] not in NOT_PROGRAM_PATHS and any(
+                    re.search(r'(?:^|-)(?:rewards?|loyalty)(?:-|$)', s) for s in segments):
+                obs.note('has_loyalty', True, 'selector', f"link to a rewards / loyalty page: {a['href']!r}")
                 return True
 
         html_lower = html_str.lower()
