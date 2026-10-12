@@ -114,29 +114,31 @@ the code does what the tests describe, not how it does on real stores.
 
 **Real stores.** Eight public stores (five Shopify, two WooCommerce, one Magento store behind a
 Cloudflare challenge), with the true values read by hand from their pages and the source URL of
-every fact in [docs/real-corpus/](docs/real-corpus/README.md). One run per store, default settings,
-cloudscraper switched off. Per field, out of 8 stores
+every fact in [docs/real-corpus/](docs/real-corpus/README.md). One run per store, default settings
+(brooklinen, whose catalogue is drawn by JavaScript, with `--render-js`), cloudscraper switched off.
+Per field, out of 8 stores
 ([docs/real-corpus/scores.md](docs/real-corpus/scores.md)):
 
 | field | match | partial | mismatch | missing |
 |---|---|---|---|---|
 | status (ok / blocked) | 8 | 0 | 0 | 0 |
 | platform | 8 | 0 | 0 | 0 |
-| products (price and compare-at price of 4 known products) | 5 | 2 | 0 | 1 |
-| free-shipping threshold | 7 | 0 | 0 | 1 |
-| return window (days) | 6 | 0 | 0 | 2 |
-| free returns | 4 | 0 | 4 | 0 |
+| products (price and compare-at price of 4 known products) | 5 | 2 | 1 | 0 |
+| free-shipping threshold | 8 | 0 | 0 | 0 |
+| return window (days) | 8 | 0 | 0 | 0 |
+| free returns | 7 | 0 | 0 | 1 |
 | payment methods | 7 | 1 | 0 | 0 |
 | review platform | 8 | 0 | 0 | 0 |
-| loyalty program | 5 | 0 | 3 | 0 |
-| email capture | 6 | 0 | 2 | 0 |
-| **total (80)** | **64** | **3** | **9** | **4** |
+| loyalty program | 7 | 0 | 1 | 0 |
+| email capture | 8 | 0 | 0 | 0 |
+| **total (80)** | **74** | **3** | **2** | **1** |
 
 "Missing" means the store states a value and the tool reported none; "mismatch" means the tool
 reported a wrong value, including a definite answer where the store states nothing. The blocked
 Magento store counts as a match on every field when the tool reports it as blocked with every field
 unknown. The remaining misses are listed one by one in
-[docs/observations.md](docs/observations.md) (sections 8 and 9).
+[docs/observations.md](docs/observations.md) (sections 8 to 11); two of them are disagreements between
+the ground truth and the store's pages, left for a decision ([docs/phase5.md](docs/phase5.md)).
 
 **Why there is a real-store corpus.** When it was first run, six of the eight real stores came
 back empty: they answered with Brotli-compressed pages, the tool asked for Brotli without a decoder
@@ -235,9 +237,10 @@ venv\Scripts\python -m pytest -q
   collection each). The price range is over that sample, not the catalogue; `report.md` and
   `business_report.md` say how many products came from how many collections.
 - Extraction is pattern-based and written for English-language pages. A phrasing the patterns do
-  not know is missed (one store's "full refund up to 120 days"), and some yes/no fields read
-  silence as "no" (free returns) or match unrelated text (a privacy notice mentioning loyalty
-  programs, an account-registration email field).
+  not know is missed (one store's loyalty program is a "membership" with none of the usual
+  words). Free returns are reported only when a page says who pays for them, and email capture
+  is unknown when only a sign-up script (Klaviyo and similar) is loaded; both are empty cells
+  then, not "no".
 - Price rules in the pressure score assume US dollars.
 - Stores behind strong bot protection end as blocked. The tool does not log in, add to cart or
   check out.

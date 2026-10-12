@@ -195,3 +195,32 @@ Not fixed, filed:
 - Under `--render-js`, `products.json` and sitemap XML would also be loaded in the browser, which
   wraps them in HTML, so they would fail to parse. Not hit in this run (the homepage links product
   pages, so no sitemap was read, and it links no JSON endpoint).
+
+### Reruns (one per store) and scores
+
+allbirds, barefootbuttons, beardbrand, deathwishcoffee, porterandyork and rastaclat were run once
+each after the fixes above (default settings, cloudscraper off); brooklinen's one run is the
+`--render-js` run above; louboutin (blocked) was not rerun.
+
+| store | Batch 1 table | after Batch 2 | pages |
+|---|---|---|---|
+| allbirds | 7/1/2/0 | 10/0/0/0 | 13 |
+| barefootbuttons | 8/0/2/0 | 9/1/0/0 | 9 |
+| beardbrand | 5/1/2/2 | 8/1/1/0 | 20 |
+| brooklinen | 7/0/1/2 | 9/0/1/0 (`--render-js`) | 12 |
+| deathwishcoffee | 9/0/1/0 | 10/0/0/0 | 17 |
+| louboutin | 10/0/0/0 | 10/0/0/0 (not rerun) | 1 |
+| porterandyork | 9/0/1/0 | 9/0/0/1 | 20 |
+| rastaclat | 9/1/0/0 | 9/1/0/0 | 13 |
+| **total** | **64/3/9/4** | **74/3/2/1** | |
+
+(match/partial/mismatch/missing.) Per field: threshold 8/8, return window 8/8, email capture 8/8,
+free returns 7 + 1 missing, loyalty 7 + 1 mismatch, payment methods 7 + 1 partial, products
+5 + 2 partial + 1 mismatch. What is left, and the two disagreements with the ground truth
+(brooklinen's rendered discount, rastaclat's Klarna), are in `docs/observations.md` section 11.
+
+- rastaclat: Google Pay is now found (product pages are reached since Batch 1), and Klarna, which
+  the ground truth does not list, comes with it.
+- barefootbuttons: products 4 -> 3 of 4, a Batch 1 effect: one collection, so 10 products
+  instead of 50.
+- porterandyork: free returns match -> missing; the returns page timed out in this run.

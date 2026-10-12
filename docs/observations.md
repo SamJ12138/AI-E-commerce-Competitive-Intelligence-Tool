@@ -460,3 +460,39 @@ From `docs/real-corpus/scores.md` (allbirds and deathwishcoffee runs of 2026-10-
   and the product-page extractor falls back to `<body>` as the price block and finds nothing. Filed
   for Batch 2.
 
+
+## 11. Phase 5 Batch 2: what is left after the reruns
+
+From `docs/real-corpus/scores.md` (one run per store, 2026-10-12; brooklinen with `--render-js`).
+Corpus 64/3/9/4 -> 74/3/2/1. Resolved from sections 8 to 10: allbirds' free returns, loyalty and
+product-page prices; barefootbuttons' free returns and email capture; beardbrand's threshold, return
+window and free returns; brooklinen's products (found), return window and loyalty;
+deathwishcoffee's free returns; porterandyork's email capture.
+
+- **beardbrand: has_loyalty False.** The Alliance membership ("purchase directly from Beardbrand
+  three times or spend $150 on a single order ... an email invite to become a member") uses none of
+  the loyalty words and its page is a product page (`/products/alliance-membership`). Telling a
+  membership program from a subscription or a gift card needs more than a pattern: filed.
+- **beardbrand: products 2 of 4 (Black Sails, Old Money Beard Oil).** Its collection pages use a
+  card the parser does not know (`a.product-item` with `span.title` and `span.price`): 9 collection
+  pages gave 9 products. Fixture-sized, but found in this batch's one run of the store; filed for
+  the next batch so the fix can be checked on the store.
+- **barefootbuttons: products 3 of 4 (was 4 of 4).** Its only product source is `/shop`, one
+  collection, so the per-collection limit (10, Batch 1) cuts the sample from 50 to 10 products and
+  the Max Bore topper is no longer in it. Topping the sample up from collections already fetched
+  when there are fewer than max_products / max_products_per_collection of them would restore it,
+  but changes the rule Batch 1 was asked for ("up to N per collection"): left for a decision.
+- **porterandyork: free_returns missing.** `/return-policy` timed out (read timeout after 30 s) in
+  this run, so the shipping page (silent on returns) was the accepted return policy; before Batch 2
+  the silence counted as False and matched. Transient; the saved returns page gives False.
+- **rastaclat: payment methods partial (extra Klarna).** A Klarna on-site messaging block is on its
+  product pages and its FAQ says "We accept most major credit cards ... as well as PayPal, Venmo,
+  and Klarna". The ground truth lists neither Klarna nor Venmo; it is not changed after reading the
+  tool's output: left for a decision.
+- **brooklinen: products mismatch.** The rendered cards show Down Comforter $169 (was $199), Robe
+  $118 and Throw $110 ("15% off"); the ground truth, read from the static product JSON, has $199
+  and $129 with no compare-at price. Down Pillow's collection is beyond `max_pages`. See
+  `docs/phase5.md` (the run's prices were read before the slashout fix, so it also reports no
+  compare-at price).
+- **Not scored: has_popup is True on all seven saved homepages.** Popups are not in the ground
+  truth; this was noticed while checking promo fields offline and not investigated.
