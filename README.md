@@ -43,7 +43,9 @@ request with a 403 challenge page, runs the tool on all three, and writes three 
 
 Add `--lang zh` to the demo command for Chinese reports. The commands call the virtual
 environment's Python directly, so there is no activation step (and no PowerShell execution-policy
-prompt).
+prompt). On Windows, if pip stops with "No such file or directory" and a hint about long paths,
+the folder is too deep for the 260-character path limit: clone into a shorter folder (for example
+`C:\src`) and start again.
 
 ## Running on real stores
 

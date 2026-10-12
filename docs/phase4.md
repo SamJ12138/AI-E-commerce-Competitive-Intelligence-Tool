@@ -133,3 +133,19 @@ RED: `tests/test_repo_hygiene.py` 6 of 7 failed (36 personal-data hits; no LICEN
 
 RED: 4 of 6 README/demo tests failed (no demo.py, no sample, quickstart missing); the console test
 failed for all three encodings (`UnicodeEncodeError: ... '\U0001f50d'`). Tests 265 -> 274.
+
+## Batch D - stopped: the repository has a fork
+
+`gh repo view`: forkCount 1, stargazerCount 3. The fork is `shhnn/-123` (public, created
+2026-03-28, no pushes of its own since it was made). The remote also has a tag `updates`
+(9182567, in the old history) besides `main`. Per the brief, nothing was pushed, no backup bundle
+or new history was built; waiting for the owner.
+
+## Batch E rehearsal (local, before any push)
+
+A fresh clone of the local branch into a new temp folder, following the README's PowerShell
+quickstart literally: clone 1 s, venv 4 s, `pip install -r requirements.txt` 12 s (packages
+cached on this machine), demo 3 s, total 19 s; the three reports in `output/demo/`. The first
+attempt, from a 150-character folder, failed in pip: lxml installs a file whose full path passed
+Windows' 260-character limit. The README now says what that error looks like and to clone into a
+shorter folder. Python 3.10.6 (the oldest version the README names): install clean, 274 passed.
