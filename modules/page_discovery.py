@@ -57,16 +57,31 @@ def page_kind(url: str, page_type: str) -> Optional[str]:
     return None
 
 
-def _rank(url: str, page_type: str) -> int:
-    """Fetch order inside max_pages: collections, shipping/returns policies, products, other policies."""
-    kind = page_kind(url, page_type)
-    if kind == 'collection':
-        return 0
-    if kind in ('shipping', 'returns'):
-        return 1
-    if kind == 'product':
-        return 2
-    return 3
+# Inside max_pages every kind gets a share: a store's menu can link dozens of collections, which
+# used to fill the whole budget before any policy or product page.
+FIRST_COLLECTIONS = 2
+FIRST_PRODUCTS = 5
+
+
+def order_pages(pages: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """Fetch order: the first collections, shipping/returns policies, the first products, the
+    remaining collections, the remaining products, other policies. Stable within each tier."""
+    seen = {'collection': 0, 'product': 0}
+
+    def tier(page):
+        kind = page_kind(*page)
+        if kind in ('shipping', 'returns'):
+            return 1
+        if kind in seen:
+            seen[kind] += 1
+            first = FIRST_COLLECTIONS if kind == 'collection' else FIRST_PRODUCTS
+            if seen[kind] <= first:
+                return 0 if kind == 'collection' else 2
+            return 3 if kind == 'collection' else 4
+        return 5
+
+    tiers = [tier(p) for p in pages]
+    return [p for _, _, p in sorted(zip(tiers, range(len(pages)), pages))]
 
 
 class PageDiscovery:
@@ -130,7 +145,7 @@ class PageDiscovery:
         else:
             obs.skip("discovery", "product pages linked from the homepage; sitemaps not needed")
 
-        found.sort(key=lambda p: _rank(*p))
+        found = order_pages(found)
         limit = max(self.config.max_pages - 1, 0)
         dropped = found[limit:]
         found = found[:limit]

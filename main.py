@@ -562,9 +562,16 @@ def analyze_site(
                           url=products_json_url)
             logger.debug(f"Could not fetch products.json: {e}")
         
-    # Analyze discovered pages
+    # Analyze discovered pages. max_products caps the products, not the pages: once it is reached,
+    # further collection / product pages are skipped and the policy pages are still read.
+    from modules.product_extractor import product_key
+    product_keys = {product_key(p.url) for p in all_products}
     for page_url, page_type in pages[:config.max_pages]:
         if page_url == url:  # Skip homepage, already processed
+            continue
+        if page_type in ('collection', 'product') and len(product_keys) >= config.max_products:
+            obs.event("products", "skip", kind="page_skipped", url=page_url, page_type=page_type,
+                      reason="max_products reached", products=len(product_keys))
             continue
         
         update_progress(f"Analyzing {page_type} page...")
@@ -587,6 +594,7 @@ def analyze_site(
         if page_type in ('collection', 'product', 'home'):
             products = extract_products(page_soup, page_url, intel.platform, page_type)
             all_products.extend(products)
+            product_keys.update(product_key(p.url) for p in products)
             for p in products:
                 _log_product(p, page_url)
             
@@ -644,12 +652,6 @@ def analyze_site(
             elif returns:
                 obs.event("policies", "skip", kind="return_policy_ignored", url=page_url,
                           return_days=returns.return_days, reason="a policy is already set and this page has no days")
-        
-        # Stop if we have enough products
-        if len(all_products) >= config.max_products:
-            obs.event("products", "skip", kind="page_loop_stopped", reason="max_products reached",
-                      products=len(all_products))
-            break
 
     obs.set_page(None)
 
@@ -657,7 +659,6 @@ def analyze_site(
     update_progress("Processing products...")
     
     # Deduplicate products by URL path (a card links '/product/x/', the page itself is '/product/x')
-    from modules.product_extractor import product_key
     seen_urls = set()
     unique_products = []
     for p in all_products:

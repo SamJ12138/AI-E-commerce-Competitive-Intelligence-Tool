@@ -149,3 +149,26 @@ then one rerun of the 8 stores (`scripts/real_corpus.py run`, same settings as B
   by a CDN-like local server that answers Brotli when offered, else gzip, else identity
   (`tests/test_content_encoding.py`). RED without brotli in the venv: 4 failed (platform
   `Custom/Unknown`, as on the real stores), 1 skipped.
+
+### Fix 2 - policy pages never fetched on stores with a big menu (allbirds, rastaclat, deathwishcoffee)
+
+After fix 1, return days / free returns / free shipping were still missing on these stores although
+their homepages link the returns page. Two causes, the second found only by the rerun:
+
+- The page loop `break`s as soon as `max_products` (50) products are collected
+  (`main.py`, "Stop if we have enough products"); on allbirds that is after the first collection.
+  Now `max_products` caps products, not pages: once reached, remaining collection / product pages
+  are skipped (obs `page_skipped`) and the policy pages are still read. Unique products (by URL
+  path) are counted, not raw cards. RED: `analyze_store("shopify_basic", max_products=1)` never
+  fetched the two policy pages.
+- The rerun with only that change scored exactly the same: the page list itself was 19 collections.
+  `_rank()` put every collection first, and a mega-menu links 37 (allbirds) to 56 (deathwish)
+  pages, so `max_pages` dropped every policy and product page before the loop
+  (`dropped_by_max_pages` in the obs log). `order_pages()` now gives each kind a share: the first
+  2 collections, shipping/returns policies, the first 5 products, the remaining collections, the
+  remaining products, other policies. RED: a hand-written homepage with 25 menu collections,
+  8 products and footer returns / shipping links put no policy page in the list.
+
+Rerun: rastaclat return_days and free_returns, porterandyork free_returns, deathwishcoffee
+return_days now match; allbirds fetches `/pages/returns-exchanges` (return_days already matched
+from the homepage).
