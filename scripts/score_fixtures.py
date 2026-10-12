@@ -144,7 +144,8 @@ def priority_404s(events, site):
             for url in guessed]
 
 
-def run_one(label, store, extra_args, out_root, python):
+def run_one(label, store, extra_args, out_root, python, config_extra=None):
+    """Run main.py on one fixture store. config_extra: more config.yaml keys (e.g. rate_limit_delay)."""
     out_dir = out_root / label
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -153,7 +154,9 @@ def run_one(label, store, extra_args, out_root, python):
     with StoreServer(store) as srv:
         site = srv.base_url
         (out_dir / "sites.txt").write_text(site + "\n", encoding="utf-8")
-        (out_dir / "config.yaml").write_text(f"db_path: {(out_dir / 'intel.db').as_posix()}\n", encoding="utf-8")
+        config_lines = [f"db_path: {(out_dir / 'intel.db').as_posix()}"]
+        config_lines += [f"{key}: {value}" for key, value in (config_extra or {}).items()]
+        (out_dir / "config.yaml").write_text("\n".join(config_lines) + "\n", encoding="utf-8")
         cmd = [python, "main.py", "--sites", str(out_dir / "sites.txt"), "--outdir", str(out_dir),
                "--config", str(out_dir / "config.yaml"), "--lang", "en"] + extra_args
         env = dict(__import__("os").environ, ECI_LOG_DIR=str(out_dir), ECI_RUN_ID=run_id,

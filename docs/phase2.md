@@ -181,3 +181,50 @@ every field null); shopify_basic and woocommerce_promo stay 16/0/0.
   hoodie price in the served copy, scan 2 reports "Highest price changed from $39.0 to $44.0",
   scan 3 reports no change; two stores on two ports scanned twice have two histories of two scans
   each and no spurious changes.
+
+## Batch 7 - guard rails
+
+- `tests/test_fixture_scores.py`: runs `scripts/score_fixtures.py`'s runs (main.py as a
+  subprocess, `rate_limit_delay: 0` via the new `run_one(..., config_extra=...)`) and fails unless
+  shopify_basic and woocommerce_promo match every ground-truth field and the blocked store is
+  status=blocked with every field null. The `--render-js` run needs a browser and only runs with
+  `ECI_TEST_RENDER_JS=1`. Against the Phase 1 sources (commit 9dd299b) it fails all four tests.
+- `scripts/hooks/pre-commit` runs the full suite (venv python if present) and refuses the commit
+  when it fails; `python scripts/install-hooks.py` installs it (an existing different hook is left
+  alone unless `--force`, which keeps it as `.bak`). It tests the working tree, including unstaged
+  changes. `.gitattributes` keeps the hook LF on Windows checkouts. Installed in this checkout.
+- `.github/workflows/ci.yml`: ubuntu-24.04 and windows-2025, Python 3.12, `actions/checkout@v5` and
+  `actions/setup-python@v6` (both Node 24), `pip install -r requirements.txt pytest`, full suite.
+  Verified locally as far as possible: the workflow is parsed and checked by
+  `tests/test_guard_rails.py`; the install and test steps were run in a fresh Python 3.10 venv
+  (no 3.12 on this machine): `pip check` clean, 170 passed. It has not run on GitHub (the branch is
+  not pushed).
+
+## Summary: Phase 1 baseline -> after Batch 7
+
+Fixture scores (match / partial / mismatch, 16 fields):
+
+| run | before | after |
+|---|---|---|
+| shopify_basic | 12 / 1 / 3 | 16 / 0 / 0 |
+| woocommerce_promo | 9 / 1 / 6 | 16 / 0 / 0 |
+| blocked | 10 / 0 / 6 | 16 / 0 / 0 (status=blocked) |
+| blocked_render_js | 10 / 0 / 6 | 16 / 0 / 0 (status=blocked) |
+
+Requests per run (score_fixtures.py, default 1.5 s per-host delay):
+
+| run | requests before | 404 before | wall before | requests after | 404 after | wall after |
+|---|---|---|---|---|---|---|
+| shopify_basic | 26 | 20 | 38.0 s | 9 | 1 | 11.5 s |
+| woocommerce_promo | 25 | 21 | 36.6 s | 8 | 0 | 10.0 s |
+| blocked | 3 | 0 | 2.1 s | 3 | 0 | 1.0 s |
+| blocked_render_js | 5 | 0 | 6.0 s | 5 | 0 | 4.9 s |
+
+Tests: 66 -> 170. Line coverage (pytest under coverage, in-process code only; main.py subprocess
+runs not counted): 30% -> 69%; main.py was never imported by the Phase 1 tests (now 64%).
+
+requirements.txt before: requests, beautifulsoup4, lxml, html5lib, urllib3, tldextract,
+robotexclusionrulesparser, pyyaml, pandas, sqlite-utils, playwright, cloudscraper, click, rich,
+python-dateutil, html2text, ratelimit, deepdiff, ollama, scikit-learn, xgboost, numpy (22).
+After: requests, beautifulsoup4, lxml, urllib3, tldextract, robotexclusionrulesparser, pyyaml,
+playwright, cloudscraper, click, rich, ollama (12).

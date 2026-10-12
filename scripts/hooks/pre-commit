@@ -1,0 +1,27 @@
+#!/bin/sh
+# pre-commit: run the full test suite; the commit is refused when a test fails.
+# Installed by `python scripts/install-hooks.py`. It tests the working tree, so unstaged
+# changes are tested too. Bypassing it (--no-verify) defeats the point; fix the test instead.
+
+repo="$(git rev-parse --show-toplevel)" || exit 1
+cd "$repo" || exit 1
+
+if [ -x venv/Scripts/python.exe ]; then
+    py=venv/Scripts/python.exe
+elif [ -x venv/bin/python ]; then
+    py=venv/bin/python
+elif [ -x .venv/Scripts/python.exe ]; then
+    py=.venv/Scripts/python.exe
+elif [ -x .venv/bin/python ]; then
+    py=.venv/bin/python
+elif command -v python3 >/dev/null 2>&1; then
+    py=python3
+else
+    py=python
+fi
+
+echo "pre-commit: $py -m pytest -q"
+if ! "$py" -m pytest -q -p no:cacheprovider; then
+    echo "pre-commit: test suite failed; commit refused" >&2
+    exit 1
+fi

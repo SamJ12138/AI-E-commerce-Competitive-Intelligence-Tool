@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        python-version: ["3.12"]
+    steps:
+      # checkout@v5 and setup-python@v6 run on Node 24
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      # Every test runs against the local fixture stores on 127.0.0.1; no real site is fetched.
+      # The --render-js fixture run needs a browser and stays off (ECI_TEST_RENDER_JS unset).
+      - name: Test suite (includes the fixture score gate)
+        run: python -m pytest -q -p no:cacheprovider
