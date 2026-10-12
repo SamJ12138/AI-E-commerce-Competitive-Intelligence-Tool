@@ -80,12 +80,19 @@
     "payment_methods": {
       "value": [
         "Shop Pay",
+        "Apple Pay",
         "Google Pay",
         "PayPal",
-        "Credit Card"
+        "Visa",
+        "Mastercard",
+        "American Express",
+        "Discover",
+        "JCB",
+        "Elo"
       ],
-      "source": "https://rastaclat.com/products/level-1-braided-bracelet",
-      "evidence": "product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\"> (cards accepted, no card brand named) and <meta id=\"in-context-paypal-metadata\">; no payment icons on the pages read"
+      "source": "https://rastaclat.com/",
+      "evidence": "homepage <script id=\"apple-pay-shop-capabilities\"> supportedNetworks [visa, masterCard, discover, amex, elo, jcb] (Apple Pay merchant config; the same list on all four Shopify stores); product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\">; <meta id=\"in-context-paypal-metadata\" data-venmo-supported=\"false\">. No payment icons on the pages read.",
+      "corrected": "2026-10-12, after the first Batch 4 rerun: the first reading took only the <link rel=buy> and PayPal metadata and missed the Apple Pay supportedNetworks list and the Venmo flag; re-read from the same saved pages, no new fetch"
     },
     "review_platform": {
       "value": "Judge.me",

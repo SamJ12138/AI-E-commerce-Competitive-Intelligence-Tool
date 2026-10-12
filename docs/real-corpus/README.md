@@ -35,10 +35,14 @@ it is the stores' content.
 - `products`: 4 products per store with price and compare-at price. `price_range`: a variable
   product (price differs by size); any price in the range is a match.
 - `payment_methods`: brands the pages name or declare. On the four Shopify stores no payment icons
-  are shown; the product pages declare Shop Pay, Google Pay and cards (no card brand) in
-  `<link rel="buy" payment=...>` and PayPal in `in-context-paypal-metadata`, so the truth is
-  `Shop Pay, Google Pay, PayPal, Credit Card` ("Credit Card" is the tool's word for cards with no
-  brand named).
+  are shown; the markup declares Shop Pay, Google Pay and cards (`<link rel="buy" payment=...>`),
+  PayPal and whether Venmo is on (`in-context-paypal-metadata`, `data-venmo-supported`), and the
+  Apple Pay merchant config with its card networks (`apple-pay-shop-capabilities`,
+  `supportedNetworks`: Visa, Mastercard, Amex, Discover, JCB, Elo, the same list on all four).
+  *Corrected 2026-10-12 after the first Batch 4 rerun:* the first reading took only the
+  `<link rel="buy">` and PayPal metadata; re-read from the same saved pages (no new fetch), each
+  file's `payment_methods.corrected` says so. The baseline verdicts did not change (the tool
+  reported no payment method on those stores).
 - `review_platform`: the app whose widget is on the product page; native WooCommerce reviews count
   as none.
 

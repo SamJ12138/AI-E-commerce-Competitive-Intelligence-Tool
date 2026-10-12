@@ -40,7 +40,7 @@ https://www.allbirds.com/ (footwear); run allbirds-20261012T134737, exit 0, 2.9 
 | free_shipping_threshold | 100 | null | missing |  |
 | return_days | 30 | null | missing |  |
 | free_returns | False | null | missing |  |
-| payment_methods | Credit Card, Google Pay, PayPal, Shop Pay | [] | missing |  |
+| payment_methods | American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Visa | [] | missing |  |
 | review_platform | Yotpo | null | missing |  |
 | has_loyalty | False | False | match |  |
 | has_email_capture | True | False | mismatch |  |
@@ -55,7 +55,7 @@ Misses:
 - free_shipping_threshold: expected 100 (from https://www.allbirds.com/), got null. obs final: source `default`, ad-hoc ShippingPolicy built from the homepage promo threshold; no extractor produced a value. Source page fetched by the tool: yes (200).
 - return_days: expected 30 (from https://www.allbirds.com/pages/returns-exchanges), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - free_returns: expected False (from https://www.allbirds.com/pages/returns-exchanges), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
-- payment_methods: expected Credit Card, Google Pay, PayPal, Shop Pay (from https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: no.
+- payment_methods: expected American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Visa (from https://www.allbirds.com/), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: yes (200).
 - review_platform: expected Yotpo (from https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - has_email_capture: expected True (from https://www.allbirds.com/), got False. obs final: source `default`, no email capture selector, email input or form keyword; no extractor produced a value. Source page fetched by the tool: yes (200).
 
@@ -101,7 +101,7 @@ https://www.brooklinen.com/ (bedding / home textiles); run brooklinen-20261012T1
 | free_shipping_threshold | 100 | null | missing |  |
 | return_days | 365 | null | missing |  |
 | free_returns | False | null | missing |  |
-| payment_methods | Credit Card, Google Pay, PayPal, Shop Pay | [] | missing |  |
+| payment_methods | American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Venmo, Visa | [] | missing |  |
 | review_platform | Yotpo | null | missing |  |
 | has_loyalty | True | False | mismatch |  |
 | has_email_capture | True | False | mismatch |  |
@@ -116,7 +116,7 @@ Misses:
 - free_shipping_threshold: expected 100 (from https://www.brooklinen.com/), got null. obs final: source `default`, ad-hoc ShippingPolicy built from the homepage promo threshold; no extractor produced a value. Source page fetched by the tool: yes (200).
 - return_days: expected 365 (from https://www.brooklinen.com/pages/returns), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - free_returns: expected False (from https://www.brooklinen.com/pages/returns), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
-- payment_methods: expected Credit Card, Google Pay, PayPal, Shop Pay (from https://www.brooklinen.com/products/down-comforter), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: no.
+- payment_methods: expected American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Venmo, Visa (from https://www.brooklinen.com/), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: yes (200).
 - review_platform: expected Yotpo (from https://www.brooklinen.com/products/down-comforter), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - has_loyalty: expected True (from https://www.brooklinen.com/pages/rewards), got False. obs final: source `default`, no loyalty wording or loyalty app signature; no extractor produced a value. Source page fetched by the tool: no.
 - has_email_capture: expected True (from https://www.brooklinen.com/), got False. obs final: source `default`, no email capture selector, email input or form keyword; no extractor produced a value. Source page fetched by the tool: yes (200).
@@ -133,7 +133,7 @@ https://www.deathwishcoffee.com/ (coffee); run deathwishcoffee-20261012T134745, 
 | free_shipping_threshold | 50 | null | missing |  |
 | return_days | 60 | null | missing |  |
 | free_returns | null | null | match |  |
-| payment_methods | Credit Card, Google Pay, PayPal, Shop Pay | [] | missing |  |
+| payment_methods | American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Venmo, Visa | [] | missing |  |
 | review_platform | Bazaarvoice | null | missing |  |
 | has_loyalty | True | False | mismatch |  |
 | has_email_capture | True | False | mismatch |  |
@@ -147,7 +147,7 @@ Misses:
 - products / Maple Cinnamon Coffee: missing; expected 13.99, compare-at null; got null, compare-at null
 - free_shipping_threshold: expected 50 (from https://www.deathwishcoffee.com/pages/help), got null. obs final: source `default`, ad-hoc ShippingPolicy built from the homepage promo threshold; no extractor produced a value. Source page fetched by the tool: no.
 - return_days: expected 60 (from https://www.deathwishcoffee.com/pages/help), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
-- payment_methods: expected Credit Card, Google Pay, PayPal, Shop Pay (from https://www.deathwishcoffee.com/products/power-surge-coffee), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: no.
+- payment_methods: expected American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Venmo, Visa (from https://www.deathwishcoffee.com/), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: yes (200).
 - review_platform: expected Bazaarvoice (from https://www.deathwishcoffee.com/products/power-surge-coffee), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - has_loyalty: expected True (from https://www.deathwishcoffee.com/pages/ritual-rewards), got False. obs final: source `default`, no loyalty wording or loyalty app signature; no extractor produced a value. Source page fetched by the tool: no.
 - has_email_capture: expected True (from https://www.deathwishcoffee.com/), got False. obs final: source `default`, no email capture selector, email input or form keyword; no extractor produced a value. Source page fetched by the tool: yes (200).
@@ -225,7 +225,7 @@ https://rastaclat.com/ (bracelets / accessories); run rastaclat-20261012T134833,
 | free_shipping_threshold | 75 | null | missing |  |
 | return_days | 14 | null | missing |  |
 | free_returns | False | null | missing |  |
-| payment_methods | Credit Card, Google Pay, PayPal, Shop Pay | [] | missing |  |
+| payment_methods | American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Visa | [] | missing |  |
 | review_platform | Judge.me | null | missing |  |
 | has_loyalty | False | False | match |  |
 | has_email_capture | True | False | mismatch |  |
@@ -240,6 +240,6 @@ Misses:
 - free_shipping_threshold: expected 75 (from https://rastaclat.com/pages/faq), got null. obs final: source `default`, ad-hoc ShippingPolicy built from the homepage promo threshold; no extractor produced a value. Source page fetched by the tool: no.
 - return_days: expected 14 (from https://rastaclat.com/pages/return-policy), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - free_returns: expected False (from https://rastaclat.com/pages/return-policy), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
-- payment_methods: expected Credit Card, Google Pay, PayPal, Shop Pay (from https://rastaclat.com/products/level-1-braided-bracelet), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: no.
+- payment_methods: expected American Express, Apple Pay, Discover, Elo, Google Pay, JCB, Mastercard, PayPal, Shop Pay, Visa (from https://rastaclat.com/), got []. obs final: source `default`, no payment pattern matched; no extractor produced a value. Source page fetched by the tool: yes (200).
 - review_platform: expected Judge.me (from https://rastaclat.com/products/level-1-braided-bracelet), got null. obs final: source `default`, no extractor produced a value; no extractor produced a value. Source page fetched by the tool: no.
 - has_email_capture: expected True (from https://rastaclat.com/), got False. obs final: source `default`, no email capture selector, email input or form keyword; no extractor produced a value. Source page fetched by the tool: yes (200).
