@@ -108,6 +108,12 @@
       "value": true,
       "source": "https://rastaclat.com/",
       "evidence": "footer: Sign up for new releases, sales, and exclusive email only deals. Enter your e-mail / Subscribe"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://rastaclat.com/",
+      "evidence": "No marketing popup in the HTML. Klaviyo's onsite script (static.klaviyo.com/onsite/js/LbT9E7/klaviyo.js) is loaded and can draw a sign-up popup in the browser, so whether one is shown cannot be told from the HTML. The quick-buy modals, cart drawer and the empty free-gift / BOGO app containers open on shopper actions.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

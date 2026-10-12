@@ -219,7 +219,7 @@ class SiteIntelligence:
     # Promotions
     promotions: List[Promotion] = field(default_factory=list)
     announcement_bar_text: str = ""
-    has_popup: bool = False
+    has_popup: Optional[bool] = False  # None: a popup script is loaded, no popup in the HTML
     has_email_capture: Optional[bool] = False  # None: a form script is loaded, no form in the HTML
     has_loyalty_program: bool = False
     has_referral_program: bool = False

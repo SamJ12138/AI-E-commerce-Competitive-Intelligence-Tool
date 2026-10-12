@@ -99,6 +99,12 @@
       "value": null,
       "source": "https://porterandyork.com/",
       "evidence": "no email field or sign-up text in the HTML; Klaviyo onsite JS (klaviyo.js) is loaded and may inject a form"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://porterandyork.com/",
+      "evidence": "No popup markup in the HTML. Klaviyo's onsite script (static.klaviyo.com/onsite/js/RwK9yn/klaviyo.js) is loaded and can draw a sign-up popup in the browser, so whether one is shown cannot be told from the HTML.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

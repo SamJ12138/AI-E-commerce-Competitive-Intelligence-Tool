@@ -61,6 +61,11 @@
       "value": null,
       "source": "https://us.christianlouboutin.com/us_en/",
       "evidence": "blocked"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "Blocked (Cloudflare challenge, 403): the store's homepage was not seen."
     }
   }
 }

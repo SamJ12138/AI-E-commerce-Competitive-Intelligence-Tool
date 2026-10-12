@@ -109,6 +109,12 @@
       "value": true,
       "source": "https://www.allbirds.com/",
       "evidence": "footer newsletter form, <input type=email name=contact[email]>"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://www.allbirds.com/",
+      "evidence": "No marketing popup in the HTML. The Attentive tag (cdn.attn.tv/allbirds/dtag.js, an SMS sign-up app) is loaded and draws its sign-up creative in the browser, so whether one is shown cannot be told from the HTML. The dialogs in the page are the added-to-cart modal, the refund / privacy / terms modals and a 'Where are we shipping to?' country selector (geofencing), none a marketing popup.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

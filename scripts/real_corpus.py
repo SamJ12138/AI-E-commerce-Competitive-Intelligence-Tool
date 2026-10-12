@@ -44,9 +44,10 @@ FIELDS = {
     "review_platform": ("review_platform", "review_platform", "text"),
     "has_loyalty": ("has_loyalty", "has_loyalty", "bool"),
     "has_email_capture": ("has_email_capture", "has_email_capture", "bool"),
+    "has_popup": ("has_popup", "has_popup", "bool"),
 }
 ORDER = ["status", "platform", "products", "free_shipping_threshold", "return_days", "free_returns",
-         "payment_methods", "review_platform", "has_loyalty", "has_email_capture"]
+         "payment_methods", "review_platform", "has_loyalty", "has_email_capture", "has_popup"]
 UNKNOWN_PLATFORM = "Custom/Unknown"
 
 BOOTSTRAP = (

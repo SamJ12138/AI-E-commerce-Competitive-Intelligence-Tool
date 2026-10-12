@@ -127,6 +127,12 @@
       "value": true,
       "source": "https://www.brooklinen.com/",
       "evidence": "footer form footer_ecap_form 'Get on the List' with an email field"
+    },
+    "has_popup": {
+      "value": true,
+      "source": "https://www.brooklinen.com/",
+      "evidence": "Exit-intent overlay in the page: div#overlayModal.js-exit-overlay (data-dy-id, shown by Dynamic Yield on exit) with 'Hold Up! Stop Right There.' and a 'Start Saving Now' button. The Attentive tag is loaded too. The cart, search, account and quick-view overlays are not marketing popups.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

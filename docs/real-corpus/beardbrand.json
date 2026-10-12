@@ -120,6 +120,12 @@
       "value": true,
       "source": "https://www.beardbrand.com/",
       "evidence": "'Grow Your Mind' newsletter form: <input type=\"email\" placeholder=\"enter your email address\" name=\"contact[email]\"> with a Subscribe button"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://www.beardbrand.com/",
+      "evidence": "The theme's popup (#modal-popup) and promotional banner (#modal-banner-home) are in the page with data-options \"enabled\": false and no content. Klaviyo's onsite script (static.klaviyo.com/onsite/js/hFArAj/klaviyo.js) is loaded and can draw a sign-up popup in the browser, so whether one is shown cannot be told from the HTML.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

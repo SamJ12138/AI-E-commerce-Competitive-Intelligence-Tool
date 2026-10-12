@@ -111,6 +111,12 @@
       "value": true,
       "source": "https://www.deathwishcoffee.com/",
       "evidence": "footer block 'SIGN UP AND SAVE 20% OFF YOUR FIRST ORDER' with a klaviyo-form container (form rendered by Klaviyo JS)"
+    },
+    "has_popup": {
+      "value": null,
+      "source": "https://www.deathwishcoffee.com/",
+      "evidence": "No marketing popup in the HTML; the 'SIGN UP AND SAVE 20% OFF YOUR FIRST ORDER' block is an inline newsletter section with an embedded Klaviyo form. Klaviyo's onsite script and the Postscript SMS SDK are loaded and can draw a popup in the browser, so whether one is shown cannot be told from the HTML. The search modal and cart notification are not marketing popups.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }

@@ -55,7 +55,7 @@
 - **Price Range:** $28 - $48 (Median: $38.00)
 - **Shipping:** free shipping over $75
 - **Returns:** 14 days
-- **Marketing:** Email Capture, Loyalty Program
+- **Marketing:** Popup, Email Capture, Loyalty Program
 
 ---
 

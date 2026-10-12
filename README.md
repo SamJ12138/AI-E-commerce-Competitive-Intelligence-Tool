@@ -162,10 +162,11 @@ missing out of 80 ([docs/real-corpus/scores-baseline.md](docs/real-corpus/scores
 | `platform` | Shopify, WooCommerce, Magento, BigCommerce, PrestaShop, Squarespace, Wix or Custom/Unknown |
 | `brand_positioning` | the store's own description of itself, quoted (meta description, title tagline or hero headline) |
 | `categories` | categories from the navigation |
-| `price_min`, `price_max`, `price_median`, `currency` | over the products read |
+| `price_min`, `price_max`, `price_median`, `currency` | over the products read; empty when no product read had a price (other amounts on the page are never used) |
 | `has_discounts` | a product shows a compare-at (struck-through) price |
 | `announcement_bar` | the text of the bar at the top of the page |
-| `has_popup`, `has_email_capture`, `has_loyalty`, `has_referral` | marketing features found |
+| `has_popup` | a marketing popup (a sign-up or offer overlay the store opens by itself, or an exit-intent overlay) is in the page; empty when none is but a script that draws popups in the browser is loaded (Klaviyo, Attentive, Postscript, ...) |
+| `has_email_capture`, `has_loyalty`, `has_referral` | marketing features found |
 | `free_shipping_threshold`, `return_days`, `free_returns` | shipping and return terms |
 | `review_platform`, `review_count` | the review app (Yotpo, Judge.me, ...) and the number of reviews shown |
 | `payment_methods` | cards, wallets and buy-now-pay-later services named or declared on the pages |

@@ -1,6 +1,6 @@
 {
   "store": "woocommerce_promo",
-  "description": "Storefront-theme WooCommerce store running a sitewide 20% sale, a points loyalty program and a Google Analytics G- tag. 14-day returns paid by the customer. Native WooCommerce reviews (no review app).",
+  "description": "Storefront-theme WooCommerce store running a sitewide 20% sale, a points loyalty program, a newsletter popup (Popup Maker, opens after 5 s) and a Google Analytics G- tag. 14-day returns paid by the customer. Native WooCommerce reviews (no review app).",
   "status": "ok",
   "platform": "WooCommerce",
   "pages": {
@@ -38,7 +38,7 @@
     "payment_methods": ["Mastercard", "PayPal", "Visa"],
     "review_platform": null,
     "has_email_capture": true,
-    "has_popup": false,
+    "has_popup": true,
     "has_loyalty": true,
     "has_referral": false,
     "pixels": ["Google Analytics"],

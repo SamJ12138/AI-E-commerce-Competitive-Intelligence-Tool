@@ -77,3 +77,77 @@ saving each rendered page to the session's scratch directory).
   compare-at). Down Pillow is now in the sample ($118, compare-at $139).
 - A default (non-rendered) run of brooklinen, where no product has a price, would now report null
   price fields with the note; it was not run (one run per store per item).
+
+## 3. has_popup
+
+- Before: True when any element's class or id contained popup / modal (and a dozen similar
+  selectors), or when the HTML contained the substring klaviyo, privy, sumo, ... anywhere. It was
+  True on all seven saved real-store homepages: a mega menu's `global-settings-popup` class
+  (deathwishcoffee), a quick-buy modal (rastaclat), the cart lightbox (barefootbuttons), the
+  added-to-cart modal (allbirds), a disabled theme popup (beardbrand), a `.modal` that happened to be
+  brooklinen's exit overlay. Not scored until now.
+- Ground truth first. The fixture stores already had `has_popup` in their ground truth (shopify_basic
+  false, woocommerce_promo false, blocked null; the scorer has compared it since Phase 1, and the old
+  detector matched because neither fixture page has a modal). woocommerce_promo now has a newsletter
+  popup (Popup Maker markup, opened after 5 s, an email field) and its ground truth is true; the
+  blocked store stays null, as every field of a store that was not seen (it cannot be "without").
+  The eight real-corpus files gained `has_popup`, read from the seven homepages saved in the
+  ground-truth reading (no new fetch) before any detector change; louboutin is null (blocked).
+
+| store | ground truth | what the homepage has |
+|---|---|---|
+| allbirds | null | no marketing popup; Attentive tag loaded (SMS sign-up creative drawn in the browser) |
+| barefootbuttons | false | cart and login lightboxes, a cookie banner; no popup script |
+| beardbrand | null | theme popup and banner present with `"enabled": false`; Klaviyo onsite loaded |
+| brooklinen | true | exit-intent overlay `#overlayModal.js-exit-overlay` ("Hold Up! Stop Right There.", "Start Saving Now") |
+| deathwishcoffee | null | inline newsletter block only; Klaviyo onsite and Postscript loaded |
+| porterandyork | null | no popup markup; Klaviyo onsite loaded |
+| rastaclat | null | quick-buy modals, cart drawer, empty free-gift / BOGO app containers; Klaviyo onsite loaded |
+
+- The detector (`PromoExtractor._detect_popup`) is now three-valued. True: an element whose id /
+  class names a popup, modal, overlay or lightbox, or a dialog, that has an email / phone field or
+  offer wording (sign up, subscribe, n% off, discount, save, offer, code, ...) or is an exit-intent
+  overlay, and that is not a functional overlay (cart, search, menu, drawer, login, account,
+  quick-view / quick-buy, policy, cookie / consent, country / geo, product, gift, loading, ...) or a
+  disabled one, itself or through an ancestor (up to, not including, `<body>`). None: no such element,
+  but a popup script is loaded (Klaviyo onsite, Attentive, Postscript, Privy, Omnisend, Justuno,
+  OptinMonster, Wisepops, Sleeknote, Wheelio, Sumo; in a script src or an inline loader's URL list).
+  False: neither. `has_popup` is `Optional[bool]` like `has_email_capture`: an empty CSV cell,
+  "unknown" in the pressure-score inputs, no "Popup" tactic.
+- `scripts/real_corpus.py` scores `has_popup` (11 fields per store).
+- RED: `tests/test_popup.py` 19 of 26 failed (every functional overlay but three was True, the
+  scripts gave True instead of None, the bare word "klaviyo" counted, the fixture and the scorer).
+  GREEN, then on the saved homepages 6 of 7: allbirds loads Attentive through Shopify's inline
+  `asyncLoad` URL list (`cdn.attn.tv\/allbirds\/dtag.js`), not a script src; a test for that case
+  failed against the src-only check, and inline loaders are read now. 7 of 7.
+- Demo sample (docs/sample, en and zh) regenerated: the WooCommerce store shows the popup (tactics,
+  "Popup" in the summary table, marketing factor 6 -> 8, weighted sum 5.60 -> 6.00, score still 6).
+
+### The seven stores (one run each, 2026-10-12)
+
+Six with default settings, brooklinen with `--render-js` as its scored run (same hook as item 2).
+
+| store | before (old detector) | after | ground truth |
+|---|---|---|---|
+| allbirds | True | None (Attentive) | null: match |
+| barefootbuttons | True | False | false: match |
+| beardbrand | True | None (Klaviyo) | null: match |
+| brooklinen | True | None (Attentive) | true: missing |
+| deathwishcoffee | True | None (Klaviyo) | null: match |
+| porterandyork | True | None (Klaviyo) | null: match |
+| rastaclat | True | None (Klaviyo) | null: match |
+
+- brooklinen's rendered `<body>` has `class="truemed-enabled swym-loading"`; "loading" is a
+  functional word and the ancestor walk included `<body>`, so the exit overlay was ruled out. The walk
+  now stops below `<body>` (page-state classes); test
+  `test_page_state_classes_on_body_do_not_hide_a_popup` failed first. Replaying this run's saved
+  rendered pages on 127.0.0.1 (no new visit): has_popup True. The scored run is kept as it was
+  (missing); brooklinen was not visited a second time for this item.
+- Every other field gives the same verdict as the runs before, except porterandyork's free_returns
+  (missing -> match: its returns page answered this time; it timed out in Phase 5).
+- Is it reliable? On the 7 homepages and both fixture pages the detector gives the ground truth
+  (brooklinen through the replay). But only two real stores get a definite value; five load a
+  popup script and stay unknown without a browser that waits for the popup's trigger. The column is
+  kept, with the unknowns stated: the old one said True on all seven, from a cart, menu, quick-buy,
+  added-to-cart or disabled element on five, the bare word "klaviyo" on porterandyork, and (by its
+  `.modal` selector) the right element only on brooklinen.

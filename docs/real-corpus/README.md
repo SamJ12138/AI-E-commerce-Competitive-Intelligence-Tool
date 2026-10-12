@@ -32,6 +32,12 @@ read: the Shopify payment methods (see `payment_methods.corrected` in those file
 
 ## Field conventions
 
+- `has_popup` (added 2026-10-12, Phase 6, read from the homepages saved in the ground-truth reading,
+  before the detector was changed): a marketing popup, i.e. an overlay the store opens by itself to
+  offer a sign-up or a deal (an exit-intent overlay counts). Cart, search, menu, login, quick-buy,
+  policy, cookie-consent and country-selector overlays do not, nor a theme popup the page marks
+  `"enabled": false`. `null` when no such popup is in the HTML but a script that draws popups in
+  the browser is loaded (Klaviyo onsite, Attentive, Postscript): it cannot be told from the HTML.
 - `null`: the pages read state nothing (no free-shipping offer, return shipping cost not stated, a
   blocked store). A definite answer from the tool is then a mismatch.
 - `return_days.accept`: the page states more than one value (deathwishcoffee: "60 day money back

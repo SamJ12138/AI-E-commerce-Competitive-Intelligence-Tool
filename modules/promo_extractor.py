@@ -107,34 +107,38 @@ class PromoExtractor:
         '.announcement__content',
     ]
     
-    # Popup/modal selectors - expanded
-    POPUP_SELECTORS = [
-        '.popup',
-        '.modal',
-        '#popup',
-        '#modal',
-        '.email-popup',
-        '.newsletter-popup',
-        '.klaviyo-form',
-        '.klaviyo-popup',
-        '.privy-popup',
-        '.omnisend-form',
-        '.sumo-popup',
-        '.wheelio',
-        '[data-popup]',
-        '.slide-in',
-        '.exit-intent',
-        # Additional modern patterns
-        '[class*="popup"]',
-        '[class*="Popup"]',
-        '[class*="modal"]',
-        '[class*="Modal"]',
-        '.overlay-popup',
-        '.lightbox',
-        '.subscribe-popup',
-        '[id*="popup"]',
-        '[id*="modal"]',
-    ]
+    # Marketing popups (has_popup): an overlay the store opens by itself to offer a sign-up or a deal.
+    # A candidate is an element whose id / class names a popup, modal, overlay or lightbox, or a
+    # dialog; it counts when it has an email / phone field or offer wording (or is an exit-intent
+    # overlay), and neither it nor an ancestor is a functional overlay or a disabled one.
+    POPUP_CANDIDATE = re.compile(r'popup|pop-up|modal|overlay|lightbox|popmake|(?:^|[-_ ])pum(?:[-_ ]|$)|exit-intent', re.I)
+    POPUP_FUNCTIONAL = re.compile(
+        r'cart|(?:^|[-_ ])atc(?:[-_ ]|$)|search|menu|nav|drawer|sidebar|login|account|register|password|'
+        r'quick|size|polic|privacy|terms|refund|cookie|consent|gdpr|cmplz|country|geo|locali[sz]|currency|'
+        r'language|video|gallery|zoom|image|media|product|variant|loading|spinner|notification|gift|bogo|'
+        r'wishlist|share|compare|review|store-?locator|age-?(?:gate|verif)', re.I)
+    POPUP_EXIT = re.compile(r'exit', re.I)
+    POPUP_OFFER = re.compile(
+        r'sign ?up|subscribe|newsletter|join (?:the|our)|\d+ ?% ?off|discount|\bsav(?:e|ing)\b|\boffer\b|'
+        r'coupon|promo code|\bcode\b|\bdeals?\b|first order|unlock|exclusive|text me', re.I)
+    POPUP_SKIP_TAGS = {'html', 'body', 'main', 'header', 'footer', 'nav', 'form', 'input', 'a', 'button', 'span',
+                       'p', 'ul', 'li', 'img', 'svg', 'path', 'script', 'style', 'template', 'noscript', 'link',
+                       'meta', 'label', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'summary', 'details'}
+    # Scripts that draw popups in the browser (signature in a script src): without --render-js the
+    # popup itself is not in the HTML.
+    POPUP_SCRIPTS = {
+        'Klaviyo': 'static.klaviyo.com/onsite',
+        'Attentive': 'cdn.attn.tv/',
+        'Postscript': 'sdk.postscript.io',
+        'Privy': 'widget.privy.com',
+        'Omnisend': 'omnisnippet',
+        'Justuno': 'justuno.com',
+        'OptinMonster': 'optinmonster',
+        'Wisepops': 'wisepops.com',
+        'Sleeknote': 'sleeknote.com',
+        'Wheelio': 'wheelio',
+        'Sumo': 'load.sumo.com',
+    }
     
     # Email capture selectors - expanded
     EMAIL_CAPTURE_SELECTORS = [
@@ -369,30 +373,65 @@ class PromoExtractor:
         obs.note('announcement_bar', '', 'default', "no announcement selector matched")
         return ''
     
-    def _detect_popup(self, soup: BeautifulSoup, html_str: str) -> bool:
-        """Detect if page has popup/modal elements."""
-        # Check for popup elements
-        for selector in self.POPUP_SELECTORS:
-            if soup.select_one(selector):
-                elem = soup.select_one(selector)
+    @staticmethod
+    def _ident(elem) -> str:
+        return ' '.join([elem.name or '', elem.get('id') or ''] + list(elem.get('class') or []))
+
+    def _popup_blocked(self, elem) -> bool:
+        """A functional overlay (cart, search, menu, login, policy, cookie, country, product, ...) or a
+        disabled one (data-options "enabled": false), itself, through an ancestor or around one."""
+        for node in [elem] + list(elem.parents):
+            if node.name in ('body', 'html', '[document]', None):  # page-state classes (swym-loading)
+                break
+            if node.name == 'template':
+                return True
+            ident = self._ident(node)
+            if self.POPUP_FUNCTIONAL.search(ident):
+                return True
+            if self._popup_disabled(node):
+                return True
+        # a wrapper around a disabled popup (beardbrand: the theme section around modal-box)
+        return elem.find(self._popup_disabled) is not None
+
+    @staticmethod
+    def _popup_disabled(node) -> bool:
+        options = ' '.join(str(node.get(k) or '') for k in ('data-options', 'data-settings'))
+        return bool(re.search(r'["\']enabled["\']\s*:\s*false', options))
+
+    def _detect_popup(self, soup: BeautifulSoup, html_str: str) -> Optional[bool]:
+        """A marketing popup (see POPUP_CANDIDATE): True when one is in the HTML; None when none is but
+        a script that draws popups in the browser is loaded; False otherwise."""
+        for elem in soup.find_all(True):
+            if elem.name in self.POPUP_SKIP_TAGS:
+                continue
+            ident = self._ident(elem)
+            dialog = elem.name == 'dialog' or elem.get('role') in ('dialog', 'alertdialog') or elem.has_attr('aria-modal')
+            if not (dialog or self.POPUP_CANDIDATE.search(ident)) or self._popup_blocked(elem):
+                continue
+            field = elem.find('input', attrs={'type': ['email', 'tel']}) or elem.find(
+                'input', attrs={'name': re.compile(r'email|phone', re.I)})
+            text = ' '.join(elem.get_text(' ', strip=True).split())
+            exit_intent = self.POPUP_EXIT.search(ident) and text
+            if field is not None or exit_intent or self.POPUP_OFFER.search(text):
+                why = 'an email/phone field' if field is not None else 'exit intent' if exit_intent else 'offer wording'
                 obs.note('has_popup', True, 'selector',
-                         f"POPUP_SELECTORS {selector!r} -> <{elem.name} class={elem.get('class')} id={elem.get('id')}>")
+                         f"marketing popup <{elem.name} id={elem.get('id')} class={elem.get('class')}> ({why})",
+                         snippet=text[:160])
                 return True
 
-        # Check for common popup libraries in scripts
-        popup_libs = [
-            'klaviyo', 'privy', 'justuno', 'wheelio', 'optinmonster',
-            'sumo', 'wisepops', 'sleeknote', 'omniconvert'
-        ]
-        for lib in popup_libs:
-            if lib in html_str.lower():
-                obs.note('has_popup', True, 'regex', f"popup library substring {lib!r} in raw html",
-                         snippet=obs.snippet(html_str, lib))
-                return True
+        # script src, or a URL in an inline loader (Shopify's asyncLoad list writes "cdn.attn.tv\/...")
+        scripts = ' '.join((tag.get('src') or '') + ' ' + (tag.string or '') for tag in soup.find_all('script'))
+        scripts = scripts.replace('\\/', '/').lower()
+        for name, signature in self.POPUP_SCRIPTS.items():
+            if signature in scripts:
+                obs.note('has_popup', None, 'default',
+                         f"no marketing popup in the HTML, but {name}'s script is loaded ({signature!r}); "
+                         "its popups are drawn by JavaScript: unknown")
+                return None
 
-        obs.note('has_popup', False, 'default', "no POPUP_SELECTORS or popup library substring matched")
+        obs.note('has_popup', False, 'default', "no marketing popup in the HTML and no popup script loaded")
         return False
-    
+
     def _detect_email_capture(self, soup: BeautifulSoup, html_str: str = '') -> Optional[bool]:
         """Detect a sign-up for marketing email. Account forms (login, register, password, checkout,
         search, cart) and menu entries without a field of their own (barefootbuttons' header

@@ -97,6 +97,12 @@
       "value": false,
       "source": "https://barefootbuttons.com/",
       "evidence": "header 'Newsletter' button targets #header-newsletter-signup, which is not on the page; the only email inputs are the account login/register forms"
+    },
+    "has_popup": {
+      "value": false,
+      "source": "https://barefootbuttons.com/",
+      "evidence": "No marketing popup and no popup app. The overlays in the page are the cart (#cart-popup, a Magnific Popup lightbox opened from the cart icon), the login form lightbox (#login-form-popup) and the Complianz cookie-consent banner.",
+      "read": "2026-10-12, from the homepage saved in the ground-truth reading (no new fetch); written before the detector was changed"
     }
   }
 }
