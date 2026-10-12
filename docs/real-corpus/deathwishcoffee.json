@@ -1,0 +1,108 @@
+{
+  "store": "deathwishcoffee",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://www.deathwishcoffee.com/",
+  "category": "coffee",
+  "in_sites_txt": false,
+  "status": "ok",
+  "pages_read": [
+    "https://www.deathwishcoffee.com/",
+    "https://www.deathwishcoffee.com/collections/all",
+    "https://www.deathwishcoffee.com/products/death-wish-instant-coffee-1",
+    "https://www.deathwishcoffee.com/products/power-surge-coffee",
+    "https://www.deathwishcoffee.com/products/call-of-the-wild-mug",
+    "https://www.deathwishcoffee.com/products/maple-cinnamon-coffee",
+    "https://www.deathwishcoffee.com/pages/help",
+    "https://www.deathwishcoffee.com/pages/ritual-rewards"
+  ],
+  "fields": {
+    "platform": {
+      "value": "Shopify",
+      "source": "https://www.deathwishcoffee.com/",
+      "evidence": "Shopify.theme, cdn.shopify.com"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Dark Roast Instant Coffee",
+          "url": "https://www.deathwishcoffee.com/products/death-wish-instant-coffee-1",
+          "price": 11.99,
+          "compare_at": null,
+          "source": "https://www.deathwishcoffee.com/products/death-wish-instant-coffee-1",
+          "evidence": "Regular price $11.99 (default variant); larger packs 23.98 / 43.99 / 69.99"
+        },
+        {
+          "title": "Power Surge Coffee",
+          "url": "https://www.deathwishcoffee.com/products/power-surge-coffee",
+          "price": 19.99,
+          "compare_at": null,
+          "source": "https://www.deathwishcoffee.com/products/power-surge-coffee",
+          "evidence": "Regular price $19.99 (default variant)"
+        },
+        {
+          "title": "Call of the Wild Mug",
+          "url": "https://www.deathwishcoffee.com/products/call-of-the-wild-mug",
+          "price": 38.0,
+          "compare_at": null,
+          "source": "https://www.deathwishcoffee.com/products/call-of-the-wild-mug",
+          "evidence": "Regular price $38.00"
+        },
+        {
+          "title": "Maple Cinnamon Coffee",
+          "url": "https://www.deathwishcoffee.com/products/maple-cinnamon-coffee",
+          "price": 13.99,
+          "compare_at": null,
+          "source": "https://www.deathwishcoffee.com/products/maple-cinnamon-coffee",
+          "evidence": "Regular price $13.99 (default variant)"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no compare-at price on the default variants"
+    },
+    "free_shipping_threshold": {
+      "value": 50.0,
+      "source": "https://www.deathwishcoffee.com/pages/help",
+      "evidence": "flat-rate shipping $8.00; If you spend over $50 USD ... free shipping"
+    },
+    "return_days": {
+      "value": 60,
+      "source": "https://www.deathwishcoffee.com/pages/help",
+      "evidence": "Refund Policy: 60 day money back guarantee; the same page also says 'let us know within 30 days of purchase ... for a full refund'",
+      "accept": [
+        60,
+        30
+      ]
+    },
+    "free_returns": {
+      "value": null,
+      "source": "https://www.deathwishcoffee.com/pages/help",
+      "evidence": "who pays return shipping is not stated"
+    },
+    "payment_methods": {
+      "value": [
+        "Shop Pay",
+        "Google Pay",
+        "PayPal",
+        "Credit Card"
+      ],
+      "source": "https://www.deathwishcoffee.com/products/power-surge-coffee",
+      "evidence": "product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\"> (cards accepted, no card brand named) and <meta id=\"in-context-paypal-metadata\">; no payment icons on the pages read"
+    },
+    "review_platform": {
+      "value": "Bazaarvoice",
+      "source": "https://www.deathwishcoffee.com/products/power-surge-coffee",
+      "evidence": "apps.bazaarvoice.com/deployments/deathwishcoffee script; okendo/yotpo/loox only as null metafield variables"
+    },
+    "has_loyalty": {
+      "value": true,
+      "source": "https://www.deathwishcoffee.com/pages/ritual-rewards",
+      "evidence": "Ritual Rewards: earn points on purchases; js.smile.io/v1/smile-shopify.js loaded on the homepage"
+    },
+    "has_email_capture": {
+      "value": true,
+      "source": "https://www.deathwishcoffee.com/",
+      "evidence": "footer block 'SIGN UP AND SAVE 20% OFF YOUR FIRST ORDER' with a klaviyo-form container (form rendered by Klaviyo JS)"
+    }
+  }
+}

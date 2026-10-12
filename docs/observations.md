@@ -358,3 +358,20 @@ Value-level defaults are not listed as rows: every report field is logged at the
 as a `field` event, and a field whose value no extractor produced carries `source: "default"`
 (for example `has_loyalty: False` on the blocked store). `scripts/score_fixtures.py` shows that
 source next to each scored value.
+
+## 7. Real-store corpus (Phase 3 Batch 3)
+
+Measured against eight real stores (`docs/real-corpus/`, scores in `docs/real-corpus/scores.md`):
+
+- **Brotli responses parsed as HTML.** `HttpClient._create_session()` advertises
+  `Accept-Encoding: gzip, deflate, br`; without `brotli` / `brotlicffi` installed urllib3 does not
+  decode `Content-Encoding: br`, so the body handed to BeautifulSoup is compressed bytes. Six of the
+  eight stores (all behind Cloudflare) were affected; nothing was extracted from them. The local
+  fixtures never compress, which is why Phases 1-2 did not see it.
+- **A page that could not be read yields `False`** for `has_email_capture` and `has_loyalty`
+  (source `default`), the same pattern Phase 2 Batch 4 fixed for blocked sites.
+- **The browser header set gets a store blocked** that serves an honest client: barefootbuttons
+  (nginx) answered 403 to the tool's Chrome UA and 200 to `ECI-RealCorpus/0.1`. Owner decision A3
+  keeps the header set; recorded here only.
+- **Crawl-delay is not honoured** (louboutin: `Crawl-delay: 60`); `RobotsChecker.get_crawl_delay()`
+  is still never called.

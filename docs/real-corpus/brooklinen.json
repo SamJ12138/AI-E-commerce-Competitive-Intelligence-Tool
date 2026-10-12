@@ -1,0 +1,124 @@
+{
+  "store": "brooklinen",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://www.brooklinen.com/",
+  "category": "bedding / home textiles",
+  "in_sites_txt": false,
+  "status": "ok",
+  "pages_read": [
+    "https://www.brooklinen.com/",
+    "https://www.brooklinen.com/collections/all-sheets",
+    "https://www.brooklinen.com/products/down-comforter",
+    "https://www.brooklinen.com/products/waffle-robe",
+    "https://www.brooklinen.com/products/down-pillow",
+    "https://www.brooklinen.com/products/dreamweave-waffle-throw-blanket",
+    "https://www.brooklinen.com/pages/returns",
+    "https://www.brooklinen.com/pages/faq",
+    "https://www.brooklinen.com/pages/rewards"
+  ],
+  "notes": [
+    "Product prices are not in the static HTML text (no h1, no JSON-LD, no visible price); they are in the page's product JSON (price_min / price_max in cents, compare_at_price_max 0). Navigation links are rendered by JavaScript (65 <a> tags on a 1.9 MB homepage). Ground truth price = lowest variant price; any variant price in the range counts as a match."
+  ],
+  "fields": {
+    "platform": {
+      "value": "Shopify",
+      "source": "https://www.brooklinen.com/",
+      "evidence": "Shopify.theme, cdn.shopify.com"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Down Comforter",
+          "url": "https://www.brooklinen.com/products/down-comforter",
+          "price": 199.0,
+          "compare_at": null,
+          "source": "https://www.brooklinen.com/products/down-comforter",
+          "evidence": "product JSON price_min 19900, price_max 59900, compare_at 0",
+          "price_range": [
+            199.0,
+            599.0
+          ]
+        },
+        {
+          "title": "Dreamweave Waffle Robe",
+          "url": "https://www.brooklinen.com/products/waffle-robe",
+          "price": 129.0,
+          "compare_at": null,
+          "source": "https://www.brooklinen.com/products/waffle-robe",
+          "evidence": "product JSON price_min 12900, price_max 14900",
+          "price_range": [
+            129.0,
+            149.0
+          ]
+        },
+        {
+          "title": "Down Pillow",
+          "url": "https://www.brooklinen.com/products/down-pillow",
+          "price": 139.0,
+          "compare_at": null,
+          "source": "https://www.brooklinen.com/products/down-pillow",
+          "evidence": "product JSON price_min 13900, price_max 17900",
+          "price_range": [
+            139.0,
+            179.0
+          ]
+        },
+        {
+          "title": "Dreamweave Waffle Throw Blanket",
+          "url": "https://www.brooklinen.com/products/dreamweave-waffle-throw-blanket",
+          "price": 129.0,
+          "compare_at": null,
+          "source": "https://www.brooklinen.com/products/dreamweave-waffle-throw-blanket",
+          "evidence": "product JSON price_min 12900, price_max 14900",
+          "price_range": [
+            129.0,
+            149.0
+          ]
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no compare-at prices"
+    },
+    "free_shipping_threshold": {
+      "value": 100.0,
+      "source": "https://www.brooklinen.com/",
+      "evidence": "Free shipping on orders $100+* ... free ground shipping on all orders over $100 (lower 48)"
+    },
+    "return_days": {
+      "value": 365,
+      "source": "https://www.brooklinen.com/pages/returns",
+      "evidence": "Most of our products can be returned or exchanged within 365 days"
+    },
+    "free_returns": {
+      "value": false,
+      "source": "https://www.brooklinen.com/pages/returns",
+      "evidence": "All returns are subject to a $9.95 return fee deducted from your refund amount"
+    },
+    "payment_methods": {
+      "value": [
+        "Shop Pay",
+        "Google Pay",
+        "PayPal",
+        "Credit Card"
+      ],
+      "source": "https://www.brooklinen.com/products/down-comforter",
+      "evidence": "product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\"> (cards accepted, no card brand named) and <meta id=\"in-context-paypal-metadata\">; no payment icons on the pages read"
+    },
+    "review_platform": {
+      "value": "Yotpo",
+      "source": "https://www.brooklinen.com/products/down-comforter",
+      "evidence": "ReviewsWidget: yotpo-widget-instance data-yotpo-product-id"
+    },
+    "has_loyalty": {
+      "value": true,
+      "source": "https://www.brooklinen.com/pages/rewards",
+      "evidence": "Brooklinen Rewards Program: every dollar you spend earns you points; Silver/Gold tiers"
+    },
+    "has_email_capture": {
+      "value": true,
+      "source": "https://www.brooklinen.com/",
+      "evidence": "footer form footer_ecap_form 'Get on the List' with an email field"
+    }
+  }
+}

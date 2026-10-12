@@ -1,0 +1,106 @@
+{
+  "store": "rastaclat",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://rastaclat.com/",
+  "category": "bracelets / accessories",
+  "in_sites_txt": true,
+  "status": "ok",
+  "pages_read": [
+    "https://rastaclat.com/",
+    "https://rastaclat.com/collections/best-sellers",
+    "https://rastaclat.com/products/level-1-braided-bracelet",
+    "https://rastaclat.com/products/merlot-braided-bracelet",
+    "https://rastaclat.com/products/karma-beaded-bracelet",
+    "https://rastaclat.com/products/manifest-beaded-bracelet",
+    "https://rastaclat.com/pages/return-policy",
+    "https://rastaclat.com/pages/faq",
+    "https://rastaclat.com/policies/shipping-policy"
+  ],
+  "fields": {
+    "platform": {
+      "value": "Shopify",
+      "source": "https://rastaclat.com/",
+      "evidence": "Shopify.theme, Shopify.routes, cdn.shopify.com in the homepage HTML"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "\"Level 1\" Braided Bracelet",
+          "url": "https://rastaclat.com/products/level-1-braided-bracelet",
+          "price": 4.99,
+          "compare_at": 19.99,
+          "source": "https://rastaclat.com/products/level-1-braided-bracelet",
+          "evidence": "Sale price $4.99, Regular price $19.99 (struck through); JSON-LD price 4.99"
+        },
+        {
+          "title": "\"Merlot\" Braided Bracelet",
+          "url": "https://rastaclat.com/products/merlot-braided-bracelet",
+          "price": 4.99,
+          "compare_at": 19.99,
+          "source": "https://rastaclat.com/products/merlot-braided-bracelet",
+          "evidence": "Sale price $4.99, Regular price $19.99; JSON-LD price 4.99"
+        },
+        {
+          "title": "\"Karma\" Beaded Bracelet",
+          "url": "https://rastaclat.com/products/karma-beaded-bracelet",
+          "price": 14.99,
+          "compare_at": 24.99,
+          "source": "https://rastaclat.com/products/karma-beaded-bracelet",
+          "evidence": "Sale price $14.99, Regular price $24.99; JSON-LD price 14.99"
+        },
+        {
+          "title": "\"Manifest\" Beaded Bracelet",
+          "url": "https://rastaclat.com/products/manifest-beaded-bracelet",
+          "price": 14.99,
+          "compare_at": 24.99,
+          "source": "https://rastaclat.com/products/manifest-beaded-bracelet",
+          "evidence": "Sale price $14.99, Regular price $24.99; JSON-LD price 14.99"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "one variant price per product (SM/LG variants share it)"
+    },
+    "free_shipping_threshold": {
+      "value": 75.0,
+      "source": "https://rastaclat.com/pages/faq",
+      "evidence": "United States: Free Fast(ish) Shipping ... on orders $75+; $9.99 under $75",
+      "note": "/policies/shipping-policy is empty (title only)"
+    },
+    "return_days": {
+      "value": 14,
+      "source": "https://rastaclat.com/pages/return-policy",
+      "evidence": "All returns need to be made within 14 days from delivery date"
+    },
+    "free_returns": {
+      "value": false,
+      "source": "https://rastaclat.com/pages/return-policy",
+      "evidence": "the customer is responsible for the cost of the return shipping label"
+    },
+    "payment_methods": {
+      "value": [
+        "Shop Pay",
+        "Google Pay",
+        "PayPal",
+        "Credit Card"
+      ],
+      "source": "https://rastaclat.com/products/level-1-braided-bracelet",
+      "evidence": "product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\"> (cards accepted, no card brand named) and <meta id=\"in-context-paypal-metadata\">; no payment icons on the pages read"
+    },
+    "review_platform": {
+      "value": "Judge.me",
+      "source": "https://rastaclat.com/products/level-1-braided-bracelet",
+      "evidence": "jdgm-widget / jdgm-rev-widg markup and settings; okendo/yotpo/loox appear only as null metafield variables in a shared snippet"
+    },
+    "has_loyalty": {
+      "value": false,
+      "source": "https://rastaclat.com/",
+      "evidence": "no loyalty program or loyalty app on the pages read; 'reward for your next purchase' is Judge.me's review-coupon setting"
+    },
+    "has_email_capture": {
+      "value": true,
+      "source": "https://rastaclat.com/",
+      "evidence": "footer: Sign up for new releases, sales, and exclusive email only deals. Enter your e-mail / Subscribe"
+    }
+  }
+}

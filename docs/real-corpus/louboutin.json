@@ -1,0 +1,66 @@
+{
+  "store": "louboutin",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://us.christianlouboutin.com/us_en/",
+  "category": "luxury footwear (Magento)",
+  "in_sites_txt": false,
+  "status": "blocked",
+  "expected_blocked": true,
+  "pages_read": [
+    "https://us.christianlouboutin.com/robots.txt",
+    "https://us.christianlouboutin.com/us_en/"
+  ],
+  "notes": [
+    "The homepage answered 403 with Server: cloudflare, cf-mitigated: challenge and a verification page ('a quick verification is required') to an honest User-Agent. Nothing about the store could be read; every field is null (the tool cannot know it). Platform: robots.txt is Magento's stock file (/pkginfo/, /catalogsearch/, /catalog/product_compare/, /onestepcheckout/), recorded as a note only.",
+    "robots.txt sets Crawl-delay: 60 for User-agent *."
+  ],
+  "fields": {
+    "platform": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked (403 challenge); Magento per robots.txt, not visible to a client that is blocked",
+      "actual": "Magento"
+    },
+    "products": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "free_shipping_threshold": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "return_days": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "free_returns": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "payment_methods": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "review_platform": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "has_loyalty": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    },
+    "has_email_capture": {
+      "value": null,
+      "source": "https://us.christianlouboutin.com/us_en/",
+      "evidence": "blocked"
+    }
+  }
+}

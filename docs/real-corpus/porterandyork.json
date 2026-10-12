@@ -1,0 +1,104 @@
+{
+  "store": "porterandyork",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://porterandyork.com/",
+  "category": "meat (perishable food)",
+  "in_sites_txt": false,
+  "status": "ok",
+  "pages_read": [
+    "https://porterandyork.com/",
+    "https://porterandyork.com/shop/",
+    "https://porterandyork.com/product/buy-filet-mignon/",
+    "https://porterandyork.com/product/beef-tri-tip/",
+    "https://porterandyork.com/product/buy-flank-steak/",
+    "https://porterandyork.com/product/natural-angus-ground-chuck-2lb/",
+    "https://porterandyork.com/return-policy/",
+    "https://porterandyork.com/shipping-policy/",
+    "https://porterandyork.com/how-it-works/"
+  ],
+  "fields": {
+    "platform": {
+      "value": "WooCommerce",
+      "source": "https://porterandyork.com/",
+      "evidence": "wp-content/plugins/woocommerce assets, woocommerce body classes"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Filet Mignon",
+          "url": "https://porterandyork.com/product/buy-filet-mignon/",
+          "price": 28.0,
+          "compare_at": null,
+          "source": "https://porterandyork.com/product/buy-filet-mignon/",
+          "evidence": "Price range: $28 through $50 (variable product: size / grade)",
+          "price_range": [
+            28.0,
+            50.0
+          ]
+        },
+        {
+          "title": "Beef Tri-Tip",
+          "url": "https://porterandyork.com/product/beef-tri-tip/",
+          "price": 39.0,
+          "compare_at": null,
+          "source": "https://porterandyork.com/product/beef-tri-tip/",
+          "evidence": "<p class=price> $39 — available on subscription; meta price 39"
+        },
+        {
+          "title": "Flank Steak",
+          "url": "https://porterandyork.com/product/buy-flank-steak/",
+          "price": 39.0,
+          "compare_at": null,
+          "source": "https://porterandyork.com/product/buy-flank-steak/",
+          "evidence": "$39 — available on subscription; meta price 39"
+        },
+        {
+          "title": "Natural Angus Ground Chuck – 2LB",
+          "url": "https://porterandyork.com/product/natural-angus-ground-chuck-2lb/",
+          "price": 20.0,
+          "compare_at": null,
+          "source": "https://porterandyork.com/product/natural-angus-ground-chuck-2lb/",
+          "evidence": "$20 — available on subscription; meta price 20"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no sale prices (no <del>) on the pages read"
+    },
+    "free_shipping_threshold": {
+      "value": null,
+      "source": "https://porterandyork.com/shipping-policy/",
+      "evidence": "shipping fee calculated from UPS rates by weight and ZIP; no free-shipping offer stated"
+    },
+    "return_days": {
+      "value": null,
+      "source": "https://porterandyork.com/return-policy/",
+      "evidence": "Due to the perishable nature of the product, we cannot accept returned merchandise"
+    },
+    "free_returns": {
+      "value": false,
+      "source": "https://porterandyork.com/return-policy/",
+      "evidence": "returns not accepted"
+    },
+    "payment_methods": {
+      "value": [],
+      "source": "https://porterandyork.com/product/buy-filet-mignon/",
+      "evidence": "no payment method named on the pages read"
+    },
+    "review_platform": {
+      "value": null,
+      "source": "https://porterandyork.com/product/buy-filet-mignon/",
+      "evidence": "no review widget or reviews"
+    },
+    "has_loyalty": {
+      "value": false,
+      "source": "https://porterandyork.com/",
+      "evidence": "no loyalty program"
+    },
+    "has_email_capture": {
+      "value": null,
+      "source": "https://porterandyork.com/",
+      "evidence": "no email field or sign-up text in the HTML; Klaviyo onsite JS (klaviyo.js) is loaded and may inject a form"
+    }
+  }
+}

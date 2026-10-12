@@ -1,0 +1,107 @@
+{
+  "store": "allbirds",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://www.allbirds.com/",
+  "category": "footwear",
+  "in_sites_txt": true,
+  "status": "ok",
+  "pages_read": [
+    "https://www.allbirds.com/",
+    "https://www.allbirds.com/collections/mens",
+    "https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey",
+    "https://www.allbirds.com/products/womens-cruiser-canvas-port",
+    "https://www.allbirds.com/products/mens-dasher-nz-anthracite",
+    "https://www.allbirds.com/products/mens-runner-nz-slip-on-mushroom",
+    "https://www.allbirds.com/pages/returns-exchanges",
+    "https://www.allbirds.com/pages/help"
+  ],
+  "notes": [
+    "robots.txt disallows /policies/ for all agents; /policies/shipping-policy was not fetched."
+  ],
+  "fields": {
+    "platform": {
+      "value": "Shopify",
+      "source": "https://www.allbirds.com/",
+      "evidence": "Shopify.theme, Shopify.routes, cdn.shopify.com"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Men's Tree Runner NZ",
+          "url": "https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey",
+          "price": 100.0,
+          "compare_at": null,
+          "source": "https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey",
+          "evidence": "$100; meta product:price:amount 100.00; JSON-LD 100"
+        },
+        {
+          "title": "Women's Canvas Cruiser",
+          "url": "https://www.allbirds.com/products/womens-cruiser-canvas-port",
+          "price": 75.0,
+          "compare_at": null,
+          "source": "https://www.allbirds.com/products/womens-cruiser-canvas-port",
+          "evidence": "$75; meta 75.00; JSON-LD 75"
+        },
+        {
+          "title": "Men's Dasher NZ",
+          "url": "https://www.allbirds.com/products/mens-dasher-nz-anthracite",
+          "price": 140.0,
+          "compare_at": null,
+          "source": "https://www.allbirds.com/products/mens-dasher-nz-anthracite",
+          "evidence": "$140; meta 140.00; JSON-LD 140"
+        },
+        {
+          "title": "Men's Runner NZ Slip On",
+          "url": "https://www.allbirds.com/products/mens-runner-nz-slip-on-mushroom",
+          "price": 105.0,
+          "compare_at": null,
+          "source": "https://www.allbirds.com/products/mens-runner-nz-slip-on-mushroom",
+          "evidence": "$105; meta 105.00; JSON-LD 105"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no compare-at price on any of them"
+    },
+    "free_shipping_threshold": {
+      "value": 100.0,
+      "source": "https://www.allbirds.com/",
+      "evidence": "announcement: Free ground shipping on orders over $100"
+    },
+    "return_days": {
+      "value": 30,
+      "source": "https://www.allbirds.com/pages/returns-exchanges",
+      "evidence": "Our standard return policy is 30 days"
+    },
+    "free_returns": {
+      "value": false,
+      "source": "https://www.allbirds.com/pages/returns-exchanges",
+      "evidence": "Customers are responsible for return shipping charges (free only with paid return coverage)"
+    },
+    "payment_methods": {
+      "value": [
+        "Shop Pay",
+        "Google Pay",
+        "PayPal",
+        "Credit Card"
+      ],
+      "source": "https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey",
+      "evidence": "product page <link rel=\"buy\" payment=\"dev.shopify.shop_pay com.google.pay dev.shopify.card\"> (cards accepted, no card brand named) and <meta id=\"in-context-paypal-metadata\">; no payment icons on the pages read"
+    },
+    "review_platform": {
+      "value": "Yotpo",
+      "source": "https://www.allbirds.com/products/mens-tree-runner-nz-medium-grey",
+      "evidence": "yotpo-widget-instance / data-yotpo-product-id on the product page"
+    },
+    "has_loyalty": {
+      "value": false,
+      "source": "https://www.allbirds.com/",
+      "evidence": "no loyalty program or app on the pages read"
+    },
+    "has_email_capture": {
+      "value": true,
+      "source": "https://www.allbirds.com/",
+      "evidence": "footer newsletter form, <input type=email name=contact[email]>"
+    }
+  }
+}

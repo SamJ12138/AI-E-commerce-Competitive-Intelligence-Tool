@@ -1,0 +1,102 @@
+{
+  "store": "barefootbuttons",
+  "visited": "2026-10-12",
+  "method": "python requests, one GET per page, robots.txt respected (RFC 9309), 4 s between requests to a host, User-Agent: ECI-RealCorpus/0.1 (ground truth for an open-source competitive-intelligence tool; +https://github.com/SamJ12138/AI-E-commerce-Competitive-Intelligence-Tool)",
+  "url": "https://barefootbuttons.com/",
+  "category": "guitar pedal accessories",
+  "in_sites_txt": false,
+  "status": "ok",
+  "pages_read": [
+    "https://www.barefootbuttons.com/ (redirects to https://barefootbuttons.com/)",
+    "https://barefootbuttons.com/shop/",
+    "https://barefootbuttons.com/product-category-max-bore/",
+    "https://barefootbuttons.com/product/v1-standard-acrylic-clear-footswitch-topper/",
+    "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+    "https://barefootbuttons.com/product/v1-standard-black-footswitch-topper/",
+    "https://barefootbuttons.com/product/max-bore-standard-silver-footswitch-topper/"
+  ],
+  "notes": [
+    "No shipping or returns policy page found: /?page_id=81 (the FAQ link), /refund_returns/ and /shipping/ all answered 404. Shipping and returns facts come from the site-wide announcement and the product pages.",
+    "Every product read costs $9.95 (the store's toppers are mostly one price)."
+  ],
+  "fields": {
+    "platform": {
+      "value": "WooCommerce",
+      "source": "https://barefootbuttons.com/",
+      "evidence": "wp-content/plugins/woocommerce, woocommerce form classes (Flatsome theme)"
+    },
+    "products": {
+      "value": [
+        {
+          "title": "Barefoot Buttons V1 Standard Clear Acrylic- Guitar Pedal Footswitch Topper",
+          "url": "https://barefootbuttons.com/product/v1-standard-acrylic-clear-footswitch-topper/",
+          "price": 9.95,
+          "compare_at": null,
+          "source": "https://barefootbuttons.com/product/v1-standard-acrylic-clear-footswitch-topper/",
+          "evidence": "$ 9.95; JSON-LD 9.95"
+        },
+        {
+          "title": "Barefoot Buttons V1 Standard Silver- Guitar Pedal Footswitch Topper",
+          "url": "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+          "price": 9.95,
+          "compare_at": null,
+          "source": "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+          "evidence": "$ 9.95; JSON-LD 9.95"
+        },
+        {
+          "title": "Barefoot Buttons V1 Standard Black- Guitar Pedal Footswitch Topper",
+          "url": "https://barefootbuttons.com/product/v1-standard-black-footswitch-topper/",
+          "price": 9.95,
+          "compare_at": null,
+          "source": "https://barefootbuttons.com/product/v1-standard-black-footswitch-topper/",
+          "evidence": "$ 9.95; JSON-LD 9.95"
+        },
+        {
+          "title": "Barefoot Buttons Max Bore Standard Silver- Guitar Pedal Footswitch Topper",
+          "url": "https://barefootbuttons.com/product/max-bore-standard-silver-footswitch-topper/",
+          "price": 9.95,
+          "compare_at": null,
+          "source": "https://barefootbuttons.com/product/max-bore-standard-silver-footswitch-topper/",
+          "evidence": "$ 9.95; JSON-LD 9.95"
+        }
+      ],
+      "source": "product pages",
+      "evidence": "no sale prices (no <del> on the shop grid)"
+    },
+    "free_shipping_threshold": {
+      "value": 35.0,
+      "source": "https://barefootbuttons.com/",
+      "evidence": "announcement: Free shipping on orders over $35"
+    },
+    "return_days": {
+      "value": 60,
+      "source": "https://barefootbuttons.com/",
+      "evidence": "announcement: 60 Day Returns (also on every product page)"
+    },
+    "free_returns": {
+      "value": null,
+      "source": "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+      "evidence": "who pays return shipping is not stated; no returns policy page found"
+    },
+    "payment_methods": {
+      "value": [],
+      "source": "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+      "evidence": "Stripe gateway with express checkout (woocommerce-gateway-stripe); no payment brand named"
+    },
+    "review_platform": {
+      "value": null,
+      "source": "https://barefootbuttons.com/product/v1-standard-silver-footswitch-topper/",
+      "evidence": "native WooCommerce reviews tab ('There are no reviews yet'), no review app"
+    },
+    "has_loyalty": {
+      "value": false,
+      "source": "https://barefootbuttons.com/",
+      "evidence": "no loyalty program"
+    },
+    "has_email_capture": {
+      "value": false,
+      "source": "https://barefootbuttons.com/",
+      "evidence": "header 'Newsletter' button targets #header-newsletter-signup, which is not on the page; the only email inputs are the account login/register forms"
+    }
+  }
+}

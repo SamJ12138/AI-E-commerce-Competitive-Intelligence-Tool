@@ -68,3 +68,62 @@ already passed.
 
 Fixture scores: 17/0/0 on all four runs (announcement_bar was a mismatch on woocommerce_promo
 before the fix).
+
+## Batch 3 - a real-store corpus and baseline scores
+
+Eight stores, ground truth read by hand on 2026-10-12 (`docs/real-corpus/README.md` has the method;
+one `<store>.json` per store with the URL every fact came from; no page HTML is committed):
+rastaclat, pfrankmd, allbirds (sites.txt); deathwishcoffee (coffee) and brooklinen (bedding) as the
+other two Shopify stores; porterandyork and barefootbuttons (WooCommerce); Christian Louboutin US
+(Magento) as the store expected to block. 55 page GETs (3 of them 404 on barefootbuttons) plus one
+robots.txt per host, all with `requests`, one GET per URL, robots.txt
+respected; allbirds disallows `/policies/`, so its shipping policy was not read.
+
+`scripts/real_corpus.py run` ran main.py once per store with default settings, except that the
+cloudscraper fallback was switched off in the launching process (real-site runs never take the
+cloudscraper path). `score` wrote `docs/real-corpus/scores.md`. Nothing was fixed in this batch.
+
+| store | status | match | partial | mismatch | missing |
+|---|---|---|---|---|---|
+| allbirds | ok | 2 | 0 | 1 | 7 |
+| barefootbuttons | blocked (requests 403) | 3 | 0 | 1 | 6 |
+| brooklinen | ok | 1 | 0 | 2 | 7 |
+| deathwishcoffee | ok | 2 | 0 | 2 | 6 |
+| louboutin | blocked (requests 403) | 10 | 0 | 0 | 0 |
+| pfrankmd | ok | 10 | 0 | 0 | 0 |
+| porterandyork | ok | 6 | 0 | 1 | 3 |
+| rastaclat | ok | 2 | 0 | 1 | 7 |
+
+What the baseline shows (10 fields per store: status plus the 9 ground-truth fields):
+
+- **Six of eight stores were read as garbage.** Every store behind Cloudflare that answered 200
+  (allbirds, brooklinen, deathwishcoffee, pfrankmd, porterandyork, rastaclat) produced
+  `platform = Custom/Unknown`, no products and no policies, although the homepage answered 200. The
+  tool's session sends `Accept-Encoding: gzip, deflate, br` (`HttpClient._create_session`, part of
+  the browser header set) and the venv has no Brotli decoder (`brotli` / `brotlicffi` not installed),
+  so urllib3 hands back the Brotli bytes undecoded and they are parsed as HTML. The ground-truth
+  fetches (plain `requests`, which only advertises encodings it can decode) received the real pages:
+
+  | store | tool: status | server | tool: body (decoded as text) | ground truth: status | ground truth: bytes |
+  |---|---|---|---|---|---|
+  | allbirds | 200 | cloudflare | 170,830 | 200 | 714,523 |
+  | brooklinen | 200 | cloudflare | 240,343 | 200 | 1,904,448 |
+  | deathwishcoffee | 200 | cloudflare | 118,354 | 200 | 642,751 |
+  | pfrankmd | 200 | cloudflare | 17,077 | 200 | 50,363 |
+  | porterandyork | 200 | cloudflare | 60,652 | 200 | 196,845 |
+  | rastaclat | 200 | cloudflare | 141,694 | 200 | 401,110 |
+
+  The 4-8x size ratio is a compression ratio. Downstream this shows up as `missing` almost
+  everywhere and as definite `False` for `has_email_capture` / `has_loyalty` (5 stores): a page the
+  tool could not read is reported as having no email capture and no loyalty program. pfrankmd's
+  10/10 and porterandyork's matches on "no free shipping" / "no return window" are accidental: nothing
+  was read, and nothing is what those pages state.
+- **porterandyork** still fetched 24 pages: its sitemaps (`/sitemap_index.xml` and children) were
+  readable and listed product URLs, but every HTML page was Brotli as well.
+- **barefootbuttons blocked the tool, not the ground-truth reader.** nginx answered 403 to the tool's
+  Chrome User-Agent and browser header set; the same homepage answered 200 to the honest
+  `ECI-RealCorpus` User-Agent. With cloudscraper off, the run ends `blocked`, `requests 403`.
+- **louboutin** answered 403 (`cf-mitigated: challenge`) to both. The tool ends `blocked`,
+  `requests 403`, every field null: 10/10. Its robots.txt sets `Crawl-delay: 60`, which the tool
+  does not read (one homepage request, so it did not matter here).
+- **pfrankmd is not a store any more** (a dermatology clinic site); kept because it is in sites.txt.
