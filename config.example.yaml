@@ -1,57 +1,28 @@
-# E-commerce Intelligence Tool Configuration
-# Copy this file to config.yaml and customize as needed
+# Optional settings file. Copy it to config.yaml (ignored by git), edit, and pass it with
+#   python main.py --sites sites.txt --config config.yaml
+# Nothing is read unless --config is given. A command-line option wins over this file; this file
+# wins over the built-in default. The values below are the defaults. Keys not listed here are
+# ignored (the run log lists them under config_keys_ignored).
 
-# Input/Output
-sites_file: sites.txt
-output_dir: output
-db_path: data/intel_cache.db
+# Seconds between two requests to the same host. If a site's robots.txt sets a longer
+# Crawl-delay, the longer one is used for that host.
+rate_limit_delay: 1.5
 
-# Request settings
+# Seconds to wait for one HTTP response (--timeout).
 timeout: 30
-rate_limit_delay: 1.5  # Seconds between requests to same domain
-user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-# Crawling limits
-max_products: 50   # Maximum products to extract per site
-max_pages: 20      # Maximum pages to crawl per site
+# HTML pages read per site, homepage included; sitemap files are not counted (--max-pages).
+max_pages: 20
 
-# Feature flags
-render_js: false      # Use Playwright for JavaScript rendering
-ignore_robots: false  # Ignore robots.txt restrictions
+# Products collected per site; once reached, the remaining product and collection pages are
+# skipped and the policy pages are still read (--max-products).
+max_products: 50
 
-# Language
-language: zh  # Output language (currently only zh supported)
+# Render pages in a headless browser (--render-js). Needs `playwright install chromium`.
+render_js: false
 
-# Advanced: Page discovery priority
-# Pages are discovered in this order
-page_priority:
-  - home
-  - collection
-  - product
-  - policy
-  - about
-  - contact
+# Fetch pages that robots.txt disallows and ignore its Crawl-delay (--ignore-robots).
+ignore_robots: false
 
-# Advanced: Keywords for category detection
-# Used to determine brand category for Chinese descriptions
-category_keywords:
-  时尚服饰:
-    - fashion
-    - clothing
-    - apparel
-    - wear
-  配饰珠宝:
-    - accessory
-    - jewelry
-    - bracelet
-    - watch
-  美妆护肤:
-    - beauty
-    - skincare
-    - cosmetics
-    - makeup
-  运动户外:
-    - sport
-    - fitness
-    - athletic
-    - outdoor
+# SQLite file where every scan is stored; --monitor compares a scan with the previous one here.
+db_path: data/intel_cache.db

@@ -145,6 +145,15 @@ def priority_404s(events, site):
             for url in guessed]
 
 
+def scrub_paths(text, replacements):
+    """Replace local directories (native, POSIX and JSON-escaped spellings) with placeholders."""
+    for directory, placeholder in sorted(replacements.items(), key=lambda kv: -len(str(kv[0]))):
+        native = str(Path(directory).resolve())
+        for spelling in {native, Path(native).as_posix(), json.dumps(native)[1:-1]}:
+            text = text.replace(spelling, placeholder)
+    return text
+
+
 def run_one(label, store, extra_args, out_root, python, config_extra=None):
     """Run main.py on one fixture store. config_extra: more config.yaml keys (e.g. rate_limit_delay)."""
     out_dir = out_root / label
@@ -332,7 +341,8 @@ def main(argv=None):
             src = Path(r["log"])
             if src.exists():
                 dst = base / "logs" / src.name
-                shutil.copyfile(src, dst)
+                dst.write_text(scrub_paths(src.read_text(encoding="utf-8"),
+                                           {out_root: "<out>", REPO: "<repo>"}), encoding="utf-8")
                 logs.append(dst)
                 r["log"] = dst.relative_to(REPO).as_posix()
         (base / "fixture_scores.md").write_text(to_markdown(results) + "\n", encoding="utf-8")

@@ -1,14 +1,9 @@
 """
-http_client.py - HTTP client with rate limiting, retries, and error handling.
+http_client.py - HTTP client with per-host delays, retries and a fetch chain.
 
-Provides a robust HTTP client that respects rate limits, handles common errors,
-and supports JavaScript rendering via Patchright (preferred) or Playwright.
-
-ANTI-BOT BYPASS HIERARCHY:
-1. Patchright - Best for Cloudflare, DataDome, etc. (patches CDP leaks)
-2. Playwright with stealth - Fallback if Patchright unavailable
-3. Cloudscraper - For simple Cloudflare challenges without browser
-4. Requests - Basic HTTP for unprotected sites
+Default chain: requests with browser-like headers -> on 403/429 the same URL once more with the
+tool's own User-Agent -> on 403 cloudscraper. With --render-js: a headless browser (Patchright when
+installed, else Playwright) -> on 403 or an error cloudscraper. docs/fetching.md describes each step.
 """
 
 import time
@@ -29,7 +24,7 @@ from urllib3.util.retry import Retry
 from urllib3.util.request import ACCEPT_ENCODING
 from bs4 import BeautifulSoup
 
-# Try Patchright first (best for bot detection bypass)
+# Browser engine for --render-js: Patchright when installed, else Playwright
 try:
     from patchright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
     PATCHRIGHT_AVAILABLE = True
@@ -43,13 +38,13 @@ except ImportError:  # obs: import-time, reported by HttpClient.__init__
         from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
         PLAYWRIGHT_AVAILABLE = True
         BROWSER_ENGINE = "playwright"
-        logger_msg = "Playwright available (consider installing patchright for better bot bypass)"
+        logger_msg = "Playwright available"
     except ImportError:  # obs: import-time, reported by HttpClient.__init__
         PLAYWRIGHT_AVAILABLE = False
         BROWSER_ENGINE = None
         logger_msg = "No browser automation available"
 
-# Try Cloudscraper for Cloudflare bypass without browser
+# cloudscraper: answers Cloudflare's JavaScript challenge without a browser (fallback after a 403)
 try:
     import cloudscraper
     CLOUDSCRAPER_AVAILABLE = True
@@ -119,21 +114,9 @@ class RateLimiter:
 
 class HttpClient:
     """
-    HTTP client with robust error handling and anti-bot bypass capabilities.
-    
-    Features:
-    - Automatic retries with exponential backoff
-    - Rate limiting per domain
-    - Anti-bot bypass via Patchright (best) or Playwright
-    - Cloudscraper fallback for Cloudflare
-    - Custom headers to avoid bot detection
-    - SSL error handling
-    
-    ANTI-BOT HIERARCHY:
-    1. Patchright - Patches CDP leaks, bypasses Cloudflare/DataDome
-    2. Playwright with stealth - Standard browser automation with stealth
-    3. Cloudscraper - Cloudflare bypass without browser
-    4. Requests - Basic HTTP
+    HTTP client: per-host delay (config delay or robots.txt Crawl-delay, whichever is longer),
+    urllib3 retries with backoff, and the fetch chain in the module docstring. Every fetch()
+    records the branches it tried (last_chain) and the obs log names the identity that got the page.
     """
     
     def __init__(self, config: Config):
@@ -242,12 +225,11 @@ class HttpClient:
         return session
     
     def _init_playwright(self) -> None:
-        """Initialize browser for anti-bot bypass (Patchright or Playwright)."""
+        """Start the headless browser used by --render-js (Patchright or Playwright)."""
         if not PLAYWRIGHT_AVAILABLE:
             raise RuntimeError(
                 "No browser automation available. Install with:\n"
-                "  pip install patchright && patchright install chrome  (RECOMMENDED)\n"
-                "  OR: pip install playwright && playwright install chromium"
+                "  pip install playwright && playwright install chromium"
             )
         
         if self._playwright is None:

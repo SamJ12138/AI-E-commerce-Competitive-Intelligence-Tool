@@ -70,3 +70,40 @@ request. It now records first. RED: `test_a_request_is_recorded_before_its_respo
 
 Tests 238 -> 258. Fixture scores 17/0/0 on all four runs; the blocked runs now make 5 and 6
 requests (robots.txt and the homepage are each asked once more with the honest User-Agent).
+
+## Batch B - license, hygiene test, fetching doc, cleanup
+
+- **Personal-data sweep** (school name and login, local account name, mail provider, Windows and
+  Linux home paths) over the
+  tracked files and `git log -p --all`. Working tree: 36 hits, all absolute local paths inside the
+  four committed run logs in `docs/baseline/logs/` (`sites_file`, `config`, `db_path`). History: the
+  same 36 in the commit that added those logs, plus the author/committer line of every commit (the
+  school address). No hit in any commit message or other file. The logs now say `<out>` for the
+  scorer's output directory; `score_fixtures.py --baseline-dir` writes them that way
+  (`scrub_paths()`).
+- `tests/test_repo_hygiene.py`: no personal-data pattern in any tracked file or path (patterns are
+  assembled from pieces so the test does not match itself); LICENSE (MIT, 2026 Tianyi Jia) and
+  NOTICE.md exist; config.yaml is ignored; config.example.yaml lists exactly the keys main.py
+  reads, each with a comment, with the defaults as values; config-file values are used unless the
+  command line sets them.
+- **Config bug found by that test:** `--timeout`, `--max-products` and `--max-pages` had click
+  defaults (30 / 50 / 20), and `cli or config` always took the CLI value, so those three keys in a
+  config file were never used. The options now default to None and `main.CONFIG_KEYS` holds the
+  defaults (command line > file > default). Keys main.py never read (`sites_file`, `output_dir`,
+  `user_agent`, `language`, `page_priority`, `category_keywords`) are gone from the example.
+- NOTICE.md: nothing third-party is bundled; fixtures imitate theme and challenge-page markup.
+- `docs/history/` deleted; `docs/fetching.md` describes robots.txt handling, the default chain
+  (browser-like headers -> own User-Agent on 403/429 -> cloudscraper on 403), the `--render-js`
+  chain (browser -> cloudscraper), and when a site ends ok / blocked / unreachable / skipped.
+  Module docstrings in `http_client.py` and the requirements comments now describe the chain in the
+  same terms (the code path is unchanged, A3).
+- Removed: `CLICK_TO_RUN.bat`, `CLICK_TO_RUN.command`, `START.ps1`, `START.sh`, `run.ps1`,
+  `setup.ps1`, `POWERSHELL_GUIDE.md` (the README quickstart replaces them), `QUICKSTART.md` (same),
+  `PRICING_PATTERNS.md` (v15 notes: "expected results after fixes" never measured; the patterns are
+  documented in `modules/price_extractor.py`), `architecture-clean.svg` (shows the threat score and
+  ML pricing removed in Phase 2 and an evidence level never produced).
+
+RED: `tests/test_repo_hygiene.py` 6 of 7 failed (36 personal-data hits; no LICENSE; no
+`main.CONFIG_KEYS`; the config file's `timeout: 7` / `max_pages: 3` / `max_products: 4` resolved to
+30 / 20 / 50; no `scrub_paths`); `config.yaml` was already ignored. Tests 258 -> 265. Fixture scores
+17/0/0 on all four runs.

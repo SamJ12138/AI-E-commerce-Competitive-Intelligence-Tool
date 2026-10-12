@@ -18,15 +18,11 @@ robotexclusionrulesparser>=1.7.1
 # Config
 pyyaml>=6.0.1
 
-# Optional: JavaScript rendering
-# RECOMMENDED: Use patchright instead of playwright for bot detection bypass
-# Install: pip install patchright && patchright install chrome
-# patchright>=1.49.0
-
-# Standard Playwright (fallback if patchright unavailable)
+# --render-js: headless browser (run `playwright install chromium` once).
+# If patchright is installed it is used instead of playwright (not required).
 playwright>=1.40.0
 
-# Cloudflare bypass for non-browser requests
+# Fallback after a 403: answers Cloudflare's JavaScript challenge without a browser
 cloudscraper>=1.2.71
 
 # CLI

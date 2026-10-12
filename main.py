@@ -882,14 +882,27 @@ def _log_final_fields(intel) -> None:
         obs.field("fields", name, value)
 
 
+# Keys main() reads from --config (config.example.yaml documents each one) and their defaults.
+# A command-line option wins over the file; the file wins over the default.
+CONFIG_KEYS = {
+    'rate_limit_delay': Config.rate_limit_delay,
+    'timeout': Config.timeout,
+    'max_pages': Config.max_pages,
+    'max_products': Config.max_products,
+    'render_js': False,
+    'ignore_robots': False,
+    'db_path': Config.db_path,
+}
+
+
 @click.command()
 @click.option('--sites', '-s', required=True, help='Path to sites.txt file with URLs')
 @click.option('--outdir', '-o', default='output', help='Output directory for reports')
 @click.option('--render-js', is_flag=True, default=False, help='Use Playwright for JS rendering')
 @click.option('--ignore-robots', is_flag=True, default=False, help='Ignore robots.txt restrictions')
-@click.option('--timeout', '-t', default=30, help='Request timeout in seconds')
-@click.option('--max-products', default=50, help='Max products to extract per site')
-@click.option('--max-pages', default=20, help='Max pages to crawl per site')
+@click.option('--timeout', '-t', type=int, default=None, help='Request timeout in seconds (default 30)')
+@click.option('--max-products', type=int, default=None, help='Max products to extract per site (default 50)')
+@click.option('--max-pages', type=int, default=None, help='Max pages to crawl per site (default 20)')
 @click.option('--monitor', '-m', is_flag=True, default=False, help='Enable monitor mode for change detection')
 @click.option('--config', '-c', default=None, help='Path to config.yaml file')
 @click.option('--verbose', '-v', is_flag=True, default=False, help='Enable verbose logging')
@@ -936,19 +949,25 @@ def main(
         obs.degraded("main.py:load_config", "input_invalid", f"config file {config!r} not found",
                      fallback="built-in defaults", stage="load")
     config_data = load_config(config)
-    
+
+    def setting(key, cli_value=None):
+        # command line > config file > default
+        if cli_value is not None:
+            return cli_value
+        return config_data.get(key, CONFIG_KEYS[key])
+
     # Build config object
     app_config = Config(
         sites_file=sites,
         output_dir=outdir,
-        render_js=render_js or config_data.get('render_js', False),
-        ignore_robots=ignore_robots or config_data.get('ignore_robots', False),
-        timeout=timeout or config_data.get('timeout', 30),
-        max_products=max_products or config_data.get('max_products', 50),
-        max_pages=max_pages or config_data.get('max_pages', 20),
+        render_js=render_js or bool(setting('render_js')),
+        ignore_robots=ignore_robots or bool(setting('ignore_robots')),
+        timeout=int(setting('timeout', timeout)),
+        max_products=int(setting('max_products', max_products)),
+        max_pages=int(setting('max_pages', max_pages)),
         monitor_mode=monitor,
-        db_path=config_data.get('db_path', 'data/intel_cache.db'),
-        rate_limit_delay=float(config_data.get('rate_limit_delay', Config.rate_limit_delay)),
+        db_path=setting('db_path'),
+        rate_limit_delay=float(setting('rate_limit_delay')),
     )
     
     obs.event("load", "success", kind="config_resolved", config_keys=sorted(config_data),
@@ -956,9 +975,7 @@ def main(
               timeout=app_config.timeout, max_products=app_config.max_products,
               max_pages=app_config.max_pages, db_path=app_config.db_path,
               rate_limit_delay=app_config.rate_limit_delay,
-              config_keys_ignored=sorted(set(config_data) - {'render_js', 'ignore_robots', 'timeout',
-                                                             'max_products', 'max_pages', 'db_path',
-                                                             'rate_limit_delay'}))
+              config_keys_ignored=sorted(set(config_data) - set(CONFIG_KEYS)))
 
     # Initialize AI analyzer if enabled
     ai_analyzer = None
