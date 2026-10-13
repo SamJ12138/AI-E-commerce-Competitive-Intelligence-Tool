@@ -6,7 +6,7 @@ structured data representation. Keeping models separate enables easy testing
 and extension.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -323,6 +323,29 @@ class SiteIntelligence:
             "pages_failed": self.pages_failed,
             "errors": self.errors
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SiteIntelligence":
+        """A stored snapshot (to_dict) back to an object; keys it does not have keep their defaults."""
+        d = _known(cls, data)
+        d['scan_timestamp'] = datetime.fromisoformat(d['scan_timestamp'])
+        if d.get('platform') is not None:
+            d['platform'] = Platform(d['platform'])
+        for key in ('hero_products', 'all_products'):
+            d[key] = [Product(**dict(_known(Product, p), price=PriceInfo(**_known(PriceInfo, p['price']))
+                                     if p.get('price') else None)) for p in d.get(key) or []]
+        for key, klass in (('promotions', Promotion), ('pixels', AnalyticsPixel), ('trust_signals', TrustSignal)):
+            d[key] = [klass(**_known(klass, x)) for x in d.get(key) or []]
+        for key, klass in (('shipping_policy', ShippingPolicy), ('return_policy', ReturnPolicy)):
+            if d.get(key) is not None:
+                d[key] = klass(**_known(klass, d[key]))
+        return cls(**d)
+
+
+def _known(klass, data: Dict[str, Any]) -> Dict[str, Any]:
+    """The keys of data that are init fields of the dataclass klass."""
+    names = {f.name for f in fields(klass) if f.init}
+    return {k: v for k, v in data.items() if k in names}
 
 
 @dataclass

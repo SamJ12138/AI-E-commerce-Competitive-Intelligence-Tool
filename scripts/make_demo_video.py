@@ -12,8 +12,10 @@ then replayed through a terminal emulator (pyte) and drawn frame by frame with P
 the first line main.py prints to "Generating reports") plays at 8x with an "8x" label; when the
 act would still run 10 s or longer the factor doubles (16x, 32x, 64x) and the label says so.
 After that, any pause longer than 0.4 s is cut to 0.4 s, and the last screen is held 1.5 s.
-Act 2, report. <work>/run/output/business_report.md is rendered to HTML with an inline
-stylesheet, opened in headless Chromium (Playwright) at 1280x720 with every network request
+Act 2, report. business_report.md is written again by the current report code from the snapshot
+the run stored (<work>/run/data/intel_cache.db, report date = scan date) into <work>/report, so a
+wording fix reaches the video without a new scan; the run's own output/ stays as recorded. It is
+rendered to HTML with an inline stylesheet, opened in headless Chromium (Playwright) at 1280x720 with every network request
 refused, and scrolled from the top to the pricing figures and then to the shipping and returns
 terms, 1.5 s on each, one screenshot per frame. A report on two or more stores has a comparison
 table, and the stops are that table; a one-store report has none, so the stops are the "Pricing"
@@ -415,6 +417,34 @@ def capture_run(run_dir, site, cols=TERM_COLS, rows=TERM_ROWS):
 
 # ------------------------------------------------------------------ report -> HTML -> frames
 
+# The options the demo command runs with (main.py defaults): what the report's methodology states.
+DEMO_RUN_INFO = {"ignore_robots": False, "render_js": False, "ai_requested": False, "ai_available": False}
+
+
+def rebuild_report(run_dir, out_dir):
+    """<out_dir>/business_report.md, written by the current report code from the snapshot the run
+    stored in <run>/data/intel_cache.db, so a change to the report wording reaches the video
+    without a new scan. The report date is the scan date. The run's own output/ is left as recorded."""
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from modules.business_report import BusinessReportGenerator
+    from modules.models import SiteIntelligence
+    from modules.snapshot_store import SnapshotStore
+
+    db = Path(run_dir) / "data" / "intel_cache.db"
+    if not db.is_file():
+        raise DemoError(f"no stored snapshot at {db}")
+    store = SnapshotStore(str(db))
+    history = store.get_all_domains_history()
+    sites = sorted((SiteIntelligence.from_dict(store.get_latest_snapshot(d)) for d in history),
+                   key=lambda i: i.scan_timestamp)
+    if not sites:
+        raise DemoError(f"{db} holds no snapshot")
+    path = BusinessReportGenerator(str(out_dir), language="en").generate_report(
+        sites, {}, history, "business_report", run_info=DEMO_RUN_INFO, report_date=sites[-1].scan_timestamp)
+    return Path(path)
+
+
 CSS = """
 html { scroll-behavior: auto; }
 body { margin: 0; background: #ffffff; color: #1f2328;
@@ -637,7 +667,7 @@ def main(argv=None):
                                            f"{speed}x", watch=("Sites analyzed: 1", "Generated business report",
                                                                "Shopify sites: 1", "Complete!"), seen=seen),
                     acts / "act1.mp4")
-    report_md = run_dir / "output" / "business_report.md"
+    report_md = rebuild_report(run_dir, work / "report")
     html_path = work / "business_report.html"
     html_path.write_text(markdown_to_html(report_md.read_text(encoding="utf-8")), encoding="utf-8")
     n2 = encode_mp4(report_frames(html_path, FPS, first_frame=n1, seen=seen), acts / "act2.mp4")

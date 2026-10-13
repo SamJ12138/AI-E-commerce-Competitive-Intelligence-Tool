@@ -14,6 +14,10 @@ comparative sentence depends on how many there are: with one site the report
 describes that site and makes no market or competitor claims. The methodology
 states what ran: pages fetched, the fetch branch that served them, whether
 robots.txt was respected, whether the LLM step ran and with which model.
+
+A field the scan could not determine (None) never reads as a negative: True states the
+feature, False states its absence, None leaves the sentence out or says "not determined", and
+counts ("k of n sites") are over the sites where the field is known.
 """
 
 import logging
@@ -55,13 +59,18 @@ T = {
         'free_suffix': ", returns are free",
         'loyalty_one': "**Loyalty:** {text}.",
         'loyalty_yes': "runs a loyalty program", 'loyalty_no': "no loyalty program found",
+        'not_determined': "not determined",
+        'shipping_unknown_one': "**Shipping:** not determined.",
+        'returns_unknown_one': "**Returns:** not determined.",
+        'loyalty_unknown_many': "**Loyalty:** not determined for any of the {n} sites.",
+        'unknown_for': " (not determined for {u})",
         # several sites
         'platforms_many': "**Platforms:** {dist}.",
         'pricing_many': "**Pricing:** across the {n} sites prices run from ${lo:.0f} to ${hi:.0f}; "
                         "the average of their median prices is ${avg:.2f}.",
         'shipping_many': "**Shipping:** {k} of {n} sites offer free shipping ({detail}).",
         'returns_many': "**Returns:** return windows found on {k} of {n} sites: {detail}.",
-        'loyalty_many': "**Loyalty:** {k} of {n} sites run a loyalty program.",
+        'loyalty_many': "**Loyalty:** {k} of {n} sites run a loyalty program{unknown}.",
         'changes_many': "**Changes since the last scan:** {k} of {n} sites changed.",
         'changes_one': "**Changes since the last scan:** yes, see the profile below.",
         # market overview
@@ -95,8 +104,8 @@ T = {
         'overlap': "The {n} sites' price ranges overlap between ${lo:.0f} and ${hi:.0f}.",
         'no_overlap': "The {n} sites' price ranges do not overlap.",
         'free_all_sites': "All {n} sites offer free shipping; the lowest threshold is ${t:.0f}.",
-        'free_no_sites': "None of the {n} sites offers free shipping.",
-        'subs_count': "{k} of {n} sites sell subscriptions.",
+        'free_no_sites': "No free-shipping offer was found on any of the {n} sites.",
+        'subs_count': "{k} of {n} sites sell subscriptions{unknown}.",
         # recommendations
         'recs': "## Recommendations",
         'recs_intro_one': "What to compare against this site:",
@@ -111,7 +120,7 @@ T = {
         'r_returns_many': "**Returns:** return windows across the sites: {detail}.",
         'r_loyalty_one': "**Retention:** this site runs a loyalty program; worth a look if repeat purchases "
                          "matter in your category.",
-        'r_loyalty_many': "**Retention:** {k} of {n} sites run a loyalty program.",
+        'r_loyalty_many': "**Retention:** {k} of {n} sites run a loyalty program{unknown}.",
         'r_email_one': "**Email capture:** this site collects emails{popup}.",
         'r_popup': " with a popup", 'r_no_popup': " without a popup",
         'r_none': "No recommendation: the analysed sites gave too little data.",
@@ -169,11 +178,16 @@ T = {
         'free_suffix': "，免费退货",
         'loyalty_one': "**会员:** {text}。",
         'loyalty_yes': "有会员积分计划", 'loyalty_no': "未发现会员计划",
+        'not_determined': "未能确定",
+        'shipping_unknown_one': "**运费:** 未能确定。",
+        'returns_unknown_one': "**退货:** 未能确定。",
+        'loyalty_unknown_many': "**会员:** {n}个站点均未能确定。",
+        'unknown_for': "（另有{u}个未能确定）",
         'platforms_many': "**平台:** {dist}。",
         'pricing_many': "**定价:** {n}个站点的价格从${lo:.0f}到${hi:.0f}；各站点中位价的平均值为${avg:.2f}。",
         'shipping_many': "**运费:** {n}个站点中有{k}个提供免运费（{detail}）。",
         'returns_many': "**退货:** {n}个站点中有{k}个找到退货期限：{detail}。",
-        'loyalty_many': "**会员:** {n}个站点中有{k}个有会员计划。",
+        'loyalty_many': "**会员:** {n}个站点中有{k}个有会员计划{unknown}。",
         'changes_many': "**变化监测:** {n}个站点中有{k}个自上次扫描以来有变化。",
         'changes_one': "**变化监测:** 自上次扫描以来有变化，见下方档案。",
         'market': "## 市场概览",
@@ -203,8 +217,8 @@ T = {
         'overlap': "{n}个站点的价格区间在${lo:.0f}到${hi:.0f}之间重叠。",
         'no_overlap': "{n}个站点的价格区间没有重叠。",
         'free_all_sites': "{n}个站点都提供免运费，最低门槛为${t:.0f}。",
-        'free_no_sites': "{n}个站点都不提供免运费。",
-        'subs_count': "{n}个站点中有{k}个提供订阅。",
+        'free_no_sites': "{n}个站点均未发现免运费政策。",
+        'subs_count': "{n}个站点中有{k}个提供订阅{unknown}。",
         'recs': "## 建议",
         'recs_intro_one': "可与该站点对照的方面：",
         'recs_intro_many': "可与这{n}个站点对照的方面：",
@@ -215,7 +229,7 @@ T = {
         'r_returns_one': "**退货:** 该站点提供{days}天退货{free}；与您的政策对比。",
         'r_returns_many': "**退货:** 各站点的退货期限：{detail}。",
         'r_loyalty_one': "**留存:** 该站点有会员积分计划；如果复购对您的品类重要，值得参考。",
-        'r_loyalty_many': "**留存:** {n}个站点中有{k}个有会员计划。",
+        'r_loyalty_many': "**留存:** {n}个站点中有{k}个有会员计划{unknown}。",
         'r_email_one': "**邮件收集:** 该站点{popup}收集邮件。",
         'r_popup': "通过弹窗", 'r_no_popup': "不使用弹窗",
         'r_none': "无建议：已分析站点提供的数据太少。",
@@ -263,6 +277,18 @@ def _return_days(intel: SiteIntelligence) -> Optional[int]:
     return intel.return_policy.return_days if intel.return_policy else None
 
 
+def three_way(value, yes, no, unknown):
+    """yes for True, no for False, unknown for None: an undetermined field is never a negative."""
+    return unknown if value is None else yes if value else no
+
+
+def known_count(sites, attr):
+    """(sites where attr is true, sites where it is known, sites where it is None)."""
+    values = [getattr(i, attr) for i in sites]
+    known = [v for v in values if v is not None]
+    return sum(1 for v in known if v), len(known), len(values) - len(known)
+
+
 class BusinessReportGenerator:
     """Business summary of a scan; see the module docstring for the rules it follows."""
 
@@ -280,18 +306,21 @@ class BusinessReportGenerator:
         scan_history: Dict[str, List[Dict]] = None,
         report_name: str = "business_report",
         run_info: Optional[Dict[str, Any]] = None,
+        report_date: Optional[datetime] = None,
     ) -> str:
         """
         Write <report_name>.md and return its path.
 
         run_info (from main): ignore_robots, render_js, ai_requested, ai_available, ai_model.
         Missing keys are reported as "not recorded" rather than guessed.
+        report_date: the date printed in the header (default today; a report rebuilt from a stored
+        snapshot passes the scan date).
         """
         run_info = run_info or {}
         analyzed = [i for i in intel_list if i.is_analyzed]
         not_seen = [i for i in intel_list if not i.is_analyzed]
 
-        lines = self._header(analyzed, not_seen)
+        lines = self._header(analyzed, not_seen, report_date or datetime.now())
         lines += self._summary(analyzed, changes)
         if len(analyzed) >= 2:
             lines += self._market_overview(analyzed)
@@ -309,10 +338,10 @@ class BusinessReportGenerator:
 
     # --- sections ------------------------------------------------------------------------------
 
-    def _header(self, analyzed, not_seen) -> List[str]:
+    def _header(self, analyzed, not_seen, report_date) -> List[str]:
         t = self.t
         ns = NOT_SEEN_TEXT[self.language]
-        lines = [t['title'], "", t['date'].format(date=datetime.now().strftime(t['date_fmt'])),
+        lines = [t['title'], "", t['date'].format(date=report_date.strftime(t['date_fmt'])),
                  t['sites'].format(n=len(analyzed))]
         for intel in not_seen:
             lines.append(t['not_seen_header'].format(status=ns['short'][intel.status].capitalize(), url=intel.url))
@@ -332,6 +361,16 @@ class BusinessReportGenerator:
         for finding in findings:
             lines += [finding, ""]
         return lines
+
+    def _count_text(self, key, sites, attr) -> str:
+        """'k of n sites ...' over the sites where attr is known, naming how many are not determined."""
+        k, n, u = known_count(sites, attr)
+        return self.t[key].format(k=k, n=n, unknown=self.t['unknown_for'].format(u=u) if u else "")
+
+    def _loyalty_many(self, key, sites) -> str:
+        if all(i.has_loyalty_program is None for i in sites):
+            return self.t['loyalty_unknown_many'].format(n=len(sites))
+        return self._count_text(key, sites, 'has_loyalty_program')
 
     def _shipping_text(self, intel) -> str:
         threshold = _threshold(intel)
@@ -354,11 +393,16 @@ class BusinessReportGenerator:
             on_sale = [p for p in priced if p.price.is_on_sale]
             out.append(t['discounts_one'].format(k=len(on_sale), m=len(priced)) if on_sale
                        else t['no_discounts_one'])
-        out.append(t['shipping_one'].format(text=self._shipping_text(intel)))
+        out.append(t['shipping_one'].format(text=self._shipping_text(intel)) if intel.shipping_policy
+                   else t['shipping_unknown_one'])
         days = _return_days(intel)
-        out.append(t['returns_one'].format(days=days, free=t['free_suffix'] if intel.return_policy.free_returns else "")
-                   if days else t['returns_none_one'])
-        out.append(t['loyalty_one'].format(text=t['loyalty_yes'] if intel.has_loyalty_program else t['loyalty_no']))
+        if days:
+            out.append(t['returns_one'].format(days=days, free=t['free_suffix'] if intel.return_policy.free_returns
+                                               else ""))
+        else:
+            out.append(t['returns_none_one'] if intel.return_policy else t['returns_unknown_one'])
+        out.append(t['loyalty_one'].format(text=three_way(intel.has_loyalty_program, t['loyalty_yes'],
+                                                          t['loyalty_no'], t['not_determined'])))
         return out
 
     def _findings_many(self, sites) -> List[str]:
@@ -380,7 +424,7 @@ class BusinessReportGenerator:
         if with_days:
             detail = sep.join(f"{site_label(i)} {_return_days(i)}{t['days_short']}" for i in with_days)
             out.append(t['returns_many'].format(k=len(with_days), n=n, detail=detail))
-        out.append(t['loyalty_many'].format(k=sum(1 for i in sites if i.has_loyalty_program), n=n))
+        out.append(self._loyalty_many('loyalty_many', sites))
         return out
 
     def _market_overview(self, sites) -> List[str]:
@@ -428,7 +472,8 @@ class BusinessReportGenerator:
                                              median=intel.price_median or intel.price_min))
         elif intel.price_note:
             lines.append(t['m_price_note'].format(note=price_note(intel.price_note, self.language)))
-        lines.append(t['m_shipping'].format(text=self._shipping_text(intel)))
+        lines.append(t['m_shipping'].format(text=self._shipping_text(intel) if intel.shipping_policy
+                                            else t['not_determined']))
         if _return_days(intel):
             lines.append(t['m_returns'].format(days=_return_days(intel),
                                                free=t['free_short'] if intel.return_policy.free_returns else ""))
@@ -457,11 +502,13 @@ class BusinessReportGenerator:
         for intel in sites:
             price = f"${intel.price_min:.0f}-${intel.price_max:.0f}" if intel.price_min else t['na']
             threshold = _threshold(intel)
-            free = f"✅ {t['all']}" if threshold == 0 else f"${threshold:.0f}+" if threshold else "❌"
+            free = (f"✅ {t['all']}" if threshold == 0 else f"${threshold:.0f}+" if threshold else
+                    "❌" if intel.shipping_policy else t['na'])
             days = _return_days(intel)
             returns = f"{days}{t['days_short']}" + (" ✅" if intel.return_policy.free_returns else "") if days else t['na']
             lines.append(f"| {site_label(intel)} | {price} | {free} | {returns} | "
-                         f"{'✅' if intel.has_loyalty_program else '❌'} | {'✅' if intel.has_subscriptions else '❌'} |")
+                         f"{three_way(intel.has_loyalty_program, '✅', '❌', t['na'])} | "
+                         f"{three_way(intel.has_subscriptions, '✅', '❌', t['na'])} |")
         lines.append("")
 
         notes = []
@@ -476,11 +523,10 @@ class BusinessReportGenerator:
         thresholds = [_threshold(i) for i in sites]
         if all(x is not None for x in thresholds):
             notes.append(t['free_all_sites'].format(n=n, t=min(thresholds)))
-        elif all(x is None for x in thresholds):
+        elif all(i.shipping_policy and x is None for i, x in zip(sites, thresholds)):
             notes.append(t['free_no_sites'].format(n=n))
-        subs = sum(1 for i in sites if i.has_subscriptions)
-        if subs:
-            notes.append(t['subs_count'].format(k=subs, n=n))
+        if any(i.has_subscriptions for i in sites):
+            notes.append(self._count_text('subs_count', sites, 'has_subscriptions'))
         if notes:
             lines += [t['notes'], ""] + [f"- {note}" for note in notes] + [""]
         return lines
@@ -501,7 +547,8 @@ class BusinessReportGenerator:
             if intel.has_loyalty_program:
                 recs.append(t['r_loyalty_one'])
             if intel.has_email_capture:
-                recs.append(t['r_email_one'].format(popup=t['r_popup'] if intel.has_popup else t['r_no_popup']))
+                recs.append(t['r_email_one'].format(popup=three_way(intel.has_popup, t['r_popup'],
+                                                                    t['r_no_popup'], "")))
             intro = t['recs_intro_one']
         else:
             priced = [i for i in sites if i.price_median]
@@ -516,8 +563,8 @@ class BusinessReportGenerator:
             if with_days:
                 recs.append(t['r_returns_many'].format(detail=sep.join(
                     f"{site_label(i)} {_return_days(i)}{t['days_short']}" for i in with_days)))
-            loyal = sum(1 for i in sites if i.has_loyalty_program)
-            recs.append(t['r_loyalty_many'].format(k=loyal, n=n))
+            if any(i.has_loyalty_program is not None for i in sites):
+                recs.append(self._count_text('r_loyalty_many', sites, 'has_loyalty_program'))
             intro = t['recs_intro_many'].format(n=n)
         lines = [t['recs'], ""]
         if not recs:

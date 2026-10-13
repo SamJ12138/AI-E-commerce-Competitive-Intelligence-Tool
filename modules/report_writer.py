@@ -582,7 +582,10 @@ class ReportWriter:
                 promos.append("会员")
             if intel.announcement_bar_text:
                 promos.append("公告栏")
-        promotions = sep.join(promos[:3]) if promos else none_str
+        # "None" only when every field it rests on is known; a field not determined (None) is N/A
+        known_promos = all(x is not None for x in (intel.has_popup, intel.has_email_capture,
+                                                    intel.has_loyalty_program, intel.announcement_bar_text))
+        promotions = sep.join(promos[:3]) if promos else none_str if known_promos else no_info
         
         # Shipping
         if intel.shipping_policy:
@@ -593,7 +596,7 @@ class ReportWriter:
                 else:
                     shipping = f"Free over ${ship.free_shipping_threshold:.0f}" if is_en else f"满${ship.free_shipping_threshold:.0f}免运费"
             else:
-                shipping = "Paid shipping" if is_en else "有运费"
+                shipping = "No free-shipping offer found" if is_en else "未发现免运费政策"
         else:
             shipping = no_info
         
@@ -626,7 +629,7 @@ class ReportWriter:
                 trust.append("分期付款")
             if any(s.signal_type == 'badge' for s in intel.trust_signals):
                 trust.append("信任徽章")
-        trust_str = sep.join(trust[:2]) if trust else none_str
+        trust_str = sep.join(trust[:2]) if trust else none_str if intel.review_platform is not None else no_info
         
         # Key replicable point
         if is_en:
@@ -654,6 +657,11 @@ class ReportWriter:
             elif intel.review_platform:
                 key_point = "评论系统"
         
+        if key_point == none_str and any(x is None for x in (intel.has_subscriptions, intel.has_bundles,
+                                                             intel.has_loyalty_program, intel.review_platform,
+                                                             intel.shipping_policy)):
+            key_point = no_info
+
         return [
             website, platform, positioning, categories, price_range,
             promotions, shipping, returns, trust_str, key_point

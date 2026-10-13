@@ -56,6 +56,7 @@ same clip can be made again. One real store (allbirds.com) was scanned once for 
   the wording with `if intel.has_popup`, so None reads as "without". It is on screen at the end of
   act 2. Fixing it changes the report, so the video would need a new scan (or a decision to
   rebuild the report from the stored snapshot) to show the corrected line.
+- Fixed afterwards: an unknown has_popup (None) was written as "this site collects emails without a popup"; unknown fields now never produce a negative claim in either report writer, and the video, rebuilt from the stored snapshot without a new scan, now reads "this site collects emails."
 - Acts: terminal 8.73 s (frames 0-261, fetch at 8x), report 8.03 s (262-502), card 2.0 s
   (503-562); `docs/demo.mp4` 18.77 s, 0.4 MB.
 - In the MP4: the progress line at 100%, "Generated business report" and "Sites analyzed: 1" are

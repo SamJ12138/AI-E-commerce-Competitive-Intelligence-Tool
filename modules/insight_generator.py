@@ -257,14 +257,15 @@ class InsightGenerator:
             else:
                 recommendations.append(r['high_price'])
 
-        if intel.has_email_capture and not intel.has_popup:
+        # None (not determined) is never read as "no": those recommendations are left out
+        if intel.has_email_capture and intel.has_popup is False:
             recommendations.append(r['email_no_popup'])
         elif intel.has_popup:
             recommendations.append(r['popup'])
 
         if intel.review_platform:
             recommendations.append(r['reviews'].format(platform=intel.review_platform))
-        elif not intel.total_reviews:
+        elif intel.review_platform is not None and not intel.total_reviews:
             recommendations.append(r['no_reviews'])
 
         threshold = getattr(intel.shipping_policy, 'free_shipping_threshold', None) if intel.shipping_policy else None
