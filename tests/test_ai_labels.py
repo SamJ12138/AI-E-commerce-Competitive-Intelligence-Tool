@@ -1,4 +1,4 @@
-"""B1: only the Ollama step is called AI, and only when it produced the text shown."""
+"""B1: only the LLM step is called AI, and only when it ran; its section names provider and model."""
 
 import re
 from datetime import datetime
@@ -6,11 +6,10 @@ from pathlib import Path
 
 from modules.models import Platform, SiteIntelligence
 
-AI_WORD = re.compile(r"\bAI\b|Qwen|Ollama|人工智能|大模型")
-LLM_INSIGHTS = {"key_insights": ["LLM insight one", "LLM insight two"],
-                "recommendations": ["LLM rec"], "raw_response": "## 关键洞察\n- LLM insight one"}
-TEMPLATE_INSIGHTS = {"key_insights": ["【平台】使用Shopify平台"], "recommendations": ["建议启用Ollama获取AI智能分析"],
-                     "ai_powered": False}
+AI_WORD = re.compile(r"\bAI\b|Qwen|Ollama|ollama|DeepSeek|deepseek|人工智能|大模型")
+ANALYSIS = {"provider": "ollama", "model": "qwen2.5:7b", "positioning": "LLM positioning [platform: Shopify]",
+            "risks": ["r1 [price_min: $24]", "r2 [price_max: $39]", "r3 [platform: Shopify]"],
+            "opportunities": ["o1 [price_min: $24]", "o2 [price_max: $39]", "o3 [platform: Shopify]"]}
 
 
 def _intel(**kw):
@@ -32,32 +31,28 @@ def test_no_ai_wording_without_the_llm(tmp_path):
     assert not AI_WORD.search(biz), AI_WORD.search(biz).group(0)
 
 
-def test_template_fallback_is_not_labelled_ai(tmp_path):
-    intel = _intel()
-    intel.ai_insights = TEMPLATE_INSIGHTS
-    intel.ai_positioning = "AI分析不可用"
-    md, biz = _reports(tmp_path, intel)
-    assert not AI_WORD.search(md) and not AI_WORD.search(biz)
-    assert "建议启用Ollama" not in md
+def test_llm_output_is_labelled_with_provider_and_model(tmp_path):
+    md, biz = _reports(tmp_path, _intel(ai_analysis=ANALYSIS))
+    for text in (md, biz):
+        assert "LLM positioning [platform: Shopify]" in text and "o3 [platform: Shopify]" in text
+        assert "AI analysis (ollama / qwen2.5:7b)" in text
+    assert "Ollama, model qwen2.5:7b" in biz
 
 
-def test_llm_output_is_labelled_with_the_model(tmp_path):
-    intel = _intel()
-    intel.ai_insights = LLM_INSIGHTS
-    intel.ai_positioning = "LLM positioning text"
-    intel.ai_model = "qwen2.5:7b"
-    md, biz = _reports(tmp_path, intel)
-    assert "LLM insight one" in md and "LLM positioning text" in md
-    assert "Ollama" in md and "qwen2.5:7b" in md
-    assert "Ollama" in biz and "qwen2.5:7b" in biz
-
-
-def test_analyzer_returns_llm_output_only_and_no_pricing_or_threat(monkeypatch):
+def test_analyzer_returns_the_three_sections_and_no_pricing_or_threat():
     from modules import ai_analyzer
-    monkeypatch.setattr(ai_analyzer.OllamaProvider, "is_available", lambda self: True)
-    monkeypatch.setattr(ai_analyzer.LLMClient, "generate",
-                        lambda self, prompt, system=None: "## 关键洞察\n- one\n- two\n## 可复制的动作建议\n- act")
-    results = ai_analyzer.AIAnalyzer(ai_analyzer.AIConfig(provider="ollama", model="m:1")).analyze_site(_intel().to_dict())
-    assert results["insights_from_llm"] and results["positioning_from_llm"]
-    assert results["insights"]["key_insights"] == ["one", "two"]
-    assert "pricing" not in results and "threat" not in results
+
+    class Provider:
+        name, model = "ollama", "m:1"
+
+        def is_available(self):
+            return True
+
+        def chat(self, system, user):
+            return ai_analyzer.ChatResult("## Positioning\np [platform: Shopify]\n## Risks\n1. a [platform: Shopify]\n"
+                                          "2. b [platform: Shopify]\n3. c [platform: Shopify]\n## Opportunities\n"
+                                          "1. d [platform: Shopify]\n2. e [platform: Shopify]\n3. f [platform: Shopify]")
+
+    results = ai_analyzer.AIAnalyzer(provider=Provider()).analyze_site(_intel().to_dict())
+    assert set(results) == {"provider", "model", "positioning", "risks", "opportunities"}
+    assert results["risks"] == ["a [platform: Shopify]", "b [platform: Shopify]", "c [platform: Shopify]"]

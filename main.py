@@ -1035,7 +1035,8 @@ def main(
     if provider is not None:
         try:
             from modules.ai_analyzer import AIAnalyzer, AIConfig
-            ai_analyzer = AIAnalyzer(AIConfig(provider=ai_provider, model=ai_model), provider=provider)
+            ai_analyzer = AIAnalyzer(AIConfig(provider=ai_provider, model=ai_model, language=lang),
+                                     provider=provider)
 
             if ai_analyzer.is_ai_available():
                 console.print(f"[green]✓ AI Analysis enabled ({ai_provider}, {ai_model})[/green]")
@@ -1157,23 +1158,17 @@ def main(
                         obs.skip("ai", f"site {intel.status}: nothing to analyse")
                     if ai_analyzer and intel.is_analyzed:
                         try:
-                            t = obs.begin("ai", model=ai_model)
-                            console.print(f"  [cyan]Running AI analysis for {domain}...[/cyan]")
-                            ai_results = ai_analyzer.analyze_site(intel.to_dict())
-
-                            # Keep only text the LLM produced; template fallbacks are not AI output
-                            if ai_results.get('insights_from_llm'):
-                                intel.ai_insights = ai_results.get('insights', {})
-                            if ai_results.get('positioning_from_llm'):
-                                intel.ai_positioning = ai_results.get('positioning', '')
-                            if intel.ai_insights or intel.ai_positioning:
-                                intel.ai_model = ai_results.get('model_used')
-                            obs.end("ai", t, ai_available=ai_results.get('ai_available'), model=intel.ai_model)
-                            for name, value in (('ai_insights', intel.ai_insights.get('key_insights')),
-                                                ('ai_positioning', intel.ai_positioning)):
-                                obs.field("fields", name, value)
-
-                            if ai_results.get('ai_available'):
+                            t = obs.begin("ai", provider=ai_provider, model=ai_model)
+                            console.print(f"  [cyan]Running AI analysis for {domain} ({ai_provider})...[/cyan]")
+                            intel.ai_analysis = ai_analyzer.analyze_site(intel.to_dict())
+                            error = intel.ai_analysis.get('error')
+                            obs.end("ai", t, provider=ai_provider, model=ai_model, error=error)
+                            obs.field("fields", "ai_analysis", None if error else
+                                      {k: intel.ai_analysis[k] for k in ('positioning', 'risks', 'opportunities')},
+                                      source=None if error else "ai", detail=f"{ai_provider} {ai_model}")
+                            if error:
+                                console.print(f"  [yellow]⚠ AI analysis unavailable ({error})[/yellow]")
+                            else:
                                 console.print(f"  [green]✓ AI analysis complete[/green]")
                         except Exception as e:
                             obs.swallowed("main.py:main", fallback="report without AI sections", stage="ai")

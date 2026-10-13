@@ -28,7 +28,7 @@ from .business_report import BusinessReportGenerator
 
 # AI-powered analysis (optional, requires additional dependencies)
 try:
-    from .ai_analyzer import AIAnalyzer, AIConfig, create_analyzer
+    from .ai_analyzer import AIAnalyzer, AIConfig
     AI_AVAILABLE = True
 except ImportError:  # obs: import-time, reported by main.py in the load stage
     AI_AVAILABLE = False
@@ -54,5 +54,5 @@ __all__ = [
     'write_markdown_report', 'write_csv',
     
     # AI (optional)
-    'AIAnalyzer', 'AIConfig', 'create_analyzer', 'AI_AVAILABLE',
+    'AIAnalyzer', 'AIConfig', 'AI_AVAILABLE',
 ]

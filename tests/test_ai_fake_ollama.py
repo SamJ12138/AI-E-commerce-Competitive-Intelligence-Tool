@@ -1,7 +1,8 @@
-"""The --ai step end to end with a fake Ollama client (Phase 5 Batch 3). Ollama itself was not
-installed on the machine where this was written, so the step is verified only against this fake:
-main.py runs on two fixture stores with --ai, a stand-in `ollama` module records every chat call,
-and the test checks what the model is asked and where its answer lands in the reports."""
+"""The --ai step end to end with a fake Ollama client (Phase 5 Batch 3, one call per store since
+Phase 8). Ollama itself is not installed on the machine where this was written, so the Ollama path
+is verified only against this fake: main.py runs on two fixture stores with --ai and
+ai_provider: ollama, a stand-in `ollama` module records every chat call, and the test checks what
+the model is asked and where its answer lands in the reports."""
 
 import csv
 import json
@@ -16,8 +17,13 @@ from tests.conftest import StoreServer
 
 REPO = Path(__file__).resolve().parent.parent
 MODEL = "fake-model:1"
-INSIGHTS = "## 关键洞察\n- FAKE-INSIGHT-ONE\n- FAKE-INSIGHT-TWO\n\n## 可复制的动作建议\n1. FAKE-ACTION-ONE\n"
-POSITIONING = "FAKE-POSITIONING-TEXT"
+# The answer shape the prompt asks for; the cited fields are ones every analysed store has
+ANSWER = "\n".join([
+    "## Positioning", "FAKE-POSITIONING [platform: Shopify]", "",
+    "## Risks", "1. FAKE-RISK-ONE [platform: Shopify]", "2. FAKE-RISK-TWO [domain: x]",
+    "3. FAKE-RISK-THREE [platform: Shopify]", "",
+    "## Opportunities", "1. FAKE-OPP-ONE [platform: Shopify]", "2. FAKE-OPP-TWO [domain: x]",
+    "3. FAKE-OPP-THREE [platform: Shopify]", ""])
 
 # A stand-in for the `ollama` package: list() offers MODEL, chat() records the call and answers.
 BOOTSTRAP = r'''
@@ -30,23 +36,13 @@ def _chat(model, messages, options=None):
     calls.append({"model": model, "messages": messages})
     with open(os.environ["FAKE_OLLAMA_LOG"], "w", encoding="utf-8") as f:
         json.dump(calls, f, ensure_ascii=False)
-    prompt = messages[-1]["content"]
-    return {"message": {"content": os.environ["FAKE_INSIGHTS"] if "关键洞察" in prompt else os.environ["FAKE_POSITIONING"]}}
+    return {"message": {"content": os.environ["FAKE_ANSWER"]}, "prompt_eval_count": 321, "eval_count": 54,
+            "done_reason": "stop"}
 fake.list, fake.chat = _list, _chat
 sys.modules["ollama"] = fake
 sys.argv = ["main.py"] + sys.argv[1:]
 runpy.run_path("main.py", run_name="__main__")
 '''
-
-# Every label the insight prompt can carry, and the pipeline field each one comes from
-PROMPT_FIELDS = {
-    "网站域名": "domain", "电商平台": "platform", "品牌名称": "brand_name", "品牌定位（页面原文）": "brand_positioning",
-    "产品品类": "categories", "价格区间": "price_min/price_max", "中位价格": "price_median", "货币": "currency",
-    "有折扣促销": "has_discounts", "公告栏内容": "announcement_bar", "有弹窗": "has_popup",
-    "邮件订阅": "has_email_capture", "会员计划": "has_loyalty", "推荐计划": "has_referral",
-    "免运费门槛": "free_shipping_threshold", "退货天数": "return_days", "免费退货": "free_returns",
-    "评论平台": "review_platform", "评论数量": "review_count", "支付方式": "payment_methods",
-}
 
 
 @pytest.fixture(scope="module")
@@ -58,8 +54,7 @@ def ai_run(tmp_path_factory):
         (out / "config.yaml").write_text(f"rate_limit_delay: 0\nai_provider: ollama\n"
                                          f"db_path: {(out / 'intel.db').as_posix()}\n", encoding="utf-8")
         env = dict(os.environ, ECI_LOG_DIR=str(out / "logs"), PYTHONIOENCODING="utf-8", FAKE_MODEL=MODEL,
-                   FAKE_OLLAMA_LOG=str(out / "ollama_calls.json"), FAKE_INSIGHTS=INSIGHTS,
-                   FAKE_POSITIONING=POSITIONING)
+                   FAKE_OLLAMA_LOG=str(out / "ollama_calls.json"), FAKE_ANSWER=ANSWER)
         proc = subprocess.run([sys.executable, "-c", BOOTSTRAP, "--sites", str(out / "sites.txt"),
                                "--outdir", str(out), "--config", str(out / "config.yaml"), "--lang", "en",
                                "--ai", "--ai-model", MODEL],
@@ -71,64 +66,67 @@ def ai_run(tmp_path_factory):
     assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
     calls = json.loads((out / "ollama_calls.json").read_text(encoding="utf-8"))
     rows = {r["domain"]: r for r in csv.DictReader(open(out / "report.csv", encoding="utf-8-sig"))}
-    return {"out": out, "calls": calls, "rows": rows, "servers": [s.base_url for s in servers]}
+    log = [json.loads(line) for p in (out / "logs").glob("run_*.jsonl")
+           for line in p.read_text(encoding="utf-8").splitlines()]
+    return {"out": out, "calls": calls, "rows": rows, "log": log, "servers": [s.base_url for s in servers]}
 
 
 def _facts(prompt):
     return dict(line[2:].split(": ", 1) for line in prompt.splitlines() if line.startswith("- ") and ": " in line)
 
 
-def test_the_model_is_asked_once_per_question_for_the_store_that_was_read(ai_run):
-    # two calls (insights, positioning) for the Shopify store; none for the blocked store
-    assert len(ai_run["calls"]) == 2
-    assert all(c["model"] == MODEL for c in ai_run["calls"])
-    ok_host = ai_run["servers"][0].split("//")[1]
-    assert sum(ok_host in c["messages"][-1]["content"] for c in ai_run["calls"]) == 1  # the insight prompt
-    assert all(ai_run["servers"][1].split("//")[1] not in c["messages"][-1]["content"] for c in ai_run["calls"])
+def test_the_model_is_asked_once_for_the_store_that_was_read(ai_run):
+    (call,) = ai_run["calls"]          # none for the blocked store
+    assert call["model"] == MODEL
+    assert ai_run["servers"][0].split("//")[1] in call["messages"][-1]["content"]
 
 
-def test_insight_prompt_carries_only_fields_the_pipeline_produced(ai_run):
-    prompt = next(c["messages"][-1]["content"] for c in ai_run["calls"] if "关键洞察" in c["messages"][-1]["content"])
+def test_prompt_carries_only_fields_the_pipeline_produced(ai_run):
+    from modules.ai_analyzer import PROMPT_FIELDS
+    prompt = ai_run["calls"][0]["messages"][-1]["content"]
     facts = _facts(prompt)
     assert set(facts) <= set(PROMPT_FIELDS), set(facts) - set(PROMPT_FIELDS)
     assert "N/A" not in prompt and "None" not in prompt
     row = next(r for r in ai_run["rows"].values() if r["status"] == "ok")
     # each value is the one the pipeline reported for the store (report.csv)
-    assert facts["网站域名"] == row["domain"]
-    assert facts["电商平台"] == row["platform"]
-    assert facts["价格区间"] == f"${float(row['price_min']):g} - ${float(row['price_max']):g}"
-    assert facts["免运费门槛"] == f"${float(row['free_shipping_threshold']):g}"
-    assert facts["退货天数"] == f"{row['return_days']}天"
-    assert facts["免费退货"] == {"True": "是", "False": "否"}[row["free_returns"]]
-    assert facts["评论平台"] == row["review_platform"]
-    assert facts["支付方式"] == row["payment_methods"].replace("; ", ", ")
-    assert facts["邮件订阅"] == {"True": "是", "False": "否"}[row["has_email_capture"]]
+    assert facts["domain"] == row["domain"]
+    assert facts["platform"] == row["platform"]
+    assert facts["price_min"] == f"${float(row['price_min']):g}"
+    assert facts["price_max"] == f"${float(row['price_max']):g}"
+    assert facts["free_shipping_threshold"] == f"${float(row['free_shipping_threshold']):g}"
+    assert facts["return_days"] == row["return_days"]
+    assert facts["free_returns"] == {"True": "yes", "False": "no"}[row["free_returns"]]
+    assert facts["review_platform"] == row["review_platform"]
+    assert facts["payment_methods"] == row["payment_methods"].replace("; ", ", ")
+    assert facts["has_email_capture"] == {"True": "yes", "False": "no"}[row["has_email_capture"]]
     # a value the pipeline did not produce is left out, not filled in
-    assert row["review_count"] == "" and "评论数量" not in facts
+    assert row["review_count"] == "" and "review_count" not in facts
 
 
-def test_positioning_prompt_quotes_the_page(ai_run):
-    prompt = next(c["messages"][-1]["content"] for c in ai_run["calls"] if "关键洞察" not in c["messages"][-1]["content"])
-    row = next(r for r in ai_run["rows"].values() if r["status"] == "ok")
-    assert row["brand_positioning"] in prompt
-    assert "N/A" not in prompt and "None" not in prompt
+def test_the_call_is_logged_with_tokens_and_without_the_prompt(ai_run):
+    (e,) = [e for e in ai_run["log"] if e["context"].get("kind") == "ai_call"]
+    assert e["event"] == "success"
+    assert (e["context"]["provider"], e["context"]["model"]) == ("ollama", MODEL)
+    assert (e["context"]["prompt_tokens"], e["context"]["completion_tokens"]) == (321, 54)
+    assert "Answer with exactly these three sections" not in json.dumps(ai_run["log"], ensure_ascii=False)
 
 
-def test_report_prints_the_response_in_the_ai_sections_of_that_store(ai_run):
+def test_report_prints_the_answer_in_the_ai_section_of_that_store(ai_run):
     md = (ai_run["out"] / "report.md").read_text(encoding="utf-8")
     ok_host, blocked_host = (u.split("//")[1] for u in ai_run["servers"])
     blocked_at = md.index(f"## 🏪 {blocked_host}")
     ok_section = md[md.index(f"## 🏪 {ok_host}"):blocked_at]
-    insights = ok_section.index("Key Insights (AI)")
-    actions = ok_section.index("Actionable Recommendations (AI)")
-    brand = ok_section.index("Brand Positioning Analysis (AI)")
-    assert insights < ok_section.index("FAKE-INSIGHT-ONE") < ok_section.index("FAKE-INSIGHT-TWO") < actions
-    assert actions < ok_section.index("FAKE-ACTION-ONE") < brand < ok_section.index(POSITIONING)
-    assert "Ollama" in ok_section and MODEL in ok_section
+    title = ok_section.index(f"AI analysis (ollama / {MODEL})")
+    assert ok_section.index("Key Insights") < title     # the rule-based text stays, before it
+    order = ["FAKE-POSITIONING", "FAKE-RISK-ONE", "FAKE-RISK-THREE", "FAKE-OPP-ONE", "FAKE-OPP-THREE"]
+    positions = [ok_section.index(word) for word in order]
+    assert title < positions[0] and positions == sorted(positions)
     # nothing from the model in the blocked store's section
     assert "FAKE-" not in md[blocked_at:]
 
 
-def test_business_report_names_the_model(ai_run):
+def test_business_report_names_provider_model_and_where_the_data_went(ai_run):
     biz = (ai_run["out"] / "business_report.md").read_text(encoding="utf-8")
-    assert MODEL in biz and "Ollama" in biz
+    assert f"AI analysis (ollama / {MODEL})" in biz and "FAKE-RISK-ONE" in biz
+    method = biz.split("### Methodology", 1)[1]
+    assert f"Ollama, model {MODEL}" in method and "did not leave this machine" in method

@@ -245,11 +245,11 @@ class SiteIntelligence:
     # Errors
     errors: List[str] = field(default_factory=list)
 
-    # Output of the optional LLM step (--ai). Set only for text the LLM actually produced;
-    # ai_model names the Ollama model and stays None when the LLM did not run.
-    ai_insights: Dict[str, Any] = field(default_factory=dict)
-    ai_positioning: str = ""
-    ai_model: Optional[str] = None
+    # Output of the optional LLM step (--ai), empty when it did not run for this site:
+    # {'provider', 'model'} plus 'positioning', 'risks' (3), 'opportunities' (3) from the parsed
+    # answer, or plus 'error' (an obs error type) when the call failed or did not parse.
+    # Not part of to_dict(): the stored snapshot holds scanned values only.
+    ai_analysis: Dict[str, Any] = field(default_factory=dict)
 
     UNKNOWN_WHEN_BLOCKED = (
         'platform', 'platform_confidence', 'brand_name', 'brand_positioning', 'brand_positioning_source',

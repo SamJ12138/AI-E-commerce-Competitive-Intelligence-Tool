@@ -73,18 +73,19 @@ def test_methodology_ignore_robots_and_ai_unavailable(tmp_path, analyzed):
 def test_methodology_names_the_model_when_the_llm_ran(tmp_path, analyzed):
     import copy
     shop = copy.deepcopy(analyzed["shopify_basic"])
-    shop.ai_model, shop.ai_insights = "qwen2.5:7b", {"key_insights": ["x"], "raw_response": "x"}
+    shop.ai_analysis = {"provider": "ollama", "model": "qwen2.5:7b", "positioning": "p [platform: Shopify]",
+                        "risks": ["r [platform: Shopify]"] * 3, "opportunities": ["o [platform: Shopify]"] * 3}
     text = _biz(tmp_path, [shop], ai_requested=True, ai_available=True)
     method = text.split("### Methodology", 1)[1]
     assert "qwen2.5:7b" in method and "1 of 1" not in method
 
 
 def test_ai_prompt_uses_only_fields_the_pipeline_produces(analyzed):
-    from modules.ai_analyzer import ChineseInsightGenerator
-    prompt = ChineseInsightGenerator(None)._build_prompt(analyzed["shopify_basic"].to_dict())
+    from modules.ai_analyzer import build_prompt
+    _, prompt, facts = build_prompt(analyzed["shopify_basic"].to_dict())
     assert "N/A" not in prompt
-    assert "$50" in prompt and "30天" in prompt          # nested shipping/return policy values
-    assert "威胁" not in prompt and "定价策略" not in prompt  # sections nothing prints
-    blocked_prompt = ChineseInsightGenerator(None)._build_prompt(
-        {"domain": "x", "platform": None, "categories": [], "payment_methods": []})
+    assert facts["free_shipping_threshold"] == "$50" and facts["return_days"] == "30"  # nested policy values
+    _, blocked_prompt, blocked_facts = build_prompt({"domain": "x", "platform": None, "categories": [],
+                                                     "payment_methods": []})
+    assert blocked_facts == {"domain": "x"}
     assert "N/A" not in blocked_prompt and "None" not in blocked_prompt

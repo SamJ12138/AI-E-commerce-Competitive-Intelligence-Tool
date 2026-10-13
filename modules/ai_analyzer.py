@@ -17,6 +17,7 @@ a fixed rubric in pressure_score.py and runs without it.
 
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -169,7 +170,7 @@ class OllamaProvider:
 
     def chat(self, system: Optional[str], user: str) -> ChatResult:
         messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
-        response = ollama.chat(model=self.model, messages=messages, options={"temperature": 0.7, "top_p": 0.9})
+        response = ollama.chat(model=self.model, messages=messages, options={"temperature": 0.3})
         return ChatResult(text=response["message"]["content"], prompt_tokens=_get(response, "prompt_eval_count"),
                           completion_tokens=_get(response, "eval_count"), finish_reason=_get(response, "done_reason"))
 
@@ -185,7 +186,7 @@ class DeepSeekProvider:
     URL = "https://api.deepseek.com/chat/completions"
 
     def __init__(self, api_key: str, model: str = DEFAULT_MODELS["deepseek"], session=None,
-                 timeout: float = 60, sleep=time.sleep, temperature: float = 0.7, max_tokens: int = 1500):
+                 timeout: float = 60, sleep=time.sleep, temperature: float = 0.3, max_tokens: int = 1500):
         self._api_key = api_key
         self.model = model
         self.session = session or requests.Session()
@@ -257,30 +258,196 @@ class LLMClient:
     def __init__(self, provider):
         self.provider = provider
         self.model = provider.model
+        self.last_error: Optional[str] = None
 
     def is_available(self) -> bool:
         return self.provider.is_available()
 
-    def generate(self, prompt: str, system: str = None) -> Optional[str]:
-        """The model's text, or None when the call failed (logged with its error_type)."""
+    def generate(self, prompt: str, system: str = None, parse=None):
+        """The model's text, or parse(text) when parse is given; None when the call failed or the
+        text did not parse (logged with its error_type, also kept in last_error). A response cut
+        off at the token limit is a parse failure."""
+        self.last_error = None
         if not self.is_available():
+            self.last_error = "external_api"
             return None
         context = {"kind": "ai_call", "provider": self.provider.name, "model": self.model}
+        result = None
         started = time.perf_counter()
         try:
             result = self.provider.chat(system, prompt)
+            if result.finish_reason == "length":
+                raise AIError("parse", "response cut off at the token limit")
+            value = parse(result.text) if parse else result.text
         except Exception as exc:
             latency = round((time.perf_counter() - started) * 1000, 2)
             message = str(exc) if isinstance(exc, AIError) else type(exc).__name__
-            obs.event("ai", "fail", duration_ms=latency, error_type=error_type_of(exc), error_message=message,
-                      latency_ms=latency, prompt_tokens=None, completion_tokens=None, **context)
+            self.last_error = error_type_of(exc)
+            obs.event("ai", "fail", duration_ms=latency, error_type=self.last_error, error_message=message,
+                      latency_ms=latency, prompt_tokens=result.prompt_tokens if result else None,
+                      completion_tokens=result.completion_tokens if result else None,
+                      finish_reason=result.finish_reason if result else None, **context)
             logger.error(f"{self.provider.name} call failed: {message}")
             return None
         latency = round((time.perf_counter() - started) * 1000, 2)
         obs.event("ai", "success", duration_ms=latency, latency_ms=latency, prompt_tokens=result.prompt_tokens,
                   completion_tokens=result.completion_tokens, finish_reason=result.finish_reason,
                   retries=result.retries, **context)
-        return result.text
+        return value
+
+
+# The prompt's facts, named as report.csv names them. Only these can be cited.
+PROMPT_FIELDS = (
+    "domain", "platform", "brand_name", "brand_positioning", "categories", "products_sampled",
+    "price_min", "price_max", "price_median", "currency", "has_discounts", "announcement_bar",
+    "has_popup", "has_email_capture", "has_loyalty", "has_referral", "free_shipping_threshold",
+    "return_days", "free_returns", "review_platform", "review_count", "payment_methods",
+)
+SECTIONS = ("positioning", "risks", "opportunities")
+LANGUAGE_NAMES = {"en": "English", "zh": "Simplified Chinese (简体中文)"}
+
+
+def prompt_facts(data: Dict) -> Dict[str, str]:
+    """{field: value as text} from intel.to_dict(), for the values the pipeline produced. An unknown
+    value (None, empty) is left out, never written as N/A."""
+    ship = data.get("shipping_policy") or {}
+    ret = data.get("return_policy") or {}
+    currency = data.get("currency")
+
+    def money(v):
+        if v is None:
+            return None
+        return f"${v:g}" if currency in (None, "USD") else f"{v:g} {currency}"
+
+    def yes_no(v):
+        return None if v is None else ("yes" if v else "no")
+
+    sample = data.get("product_sample") or {}
+    threshold = ship.get("free_shipping_threshold")
+    values = {
+        "domain": data.get("domain"),
+        "platform": data.get("platform"),
+        "brand_name": data.get("brand_name"),
+        "brand_positioning": (data.get("brand_positioning") or "")[:300],
+        "categories": ", ".join((data.get("categories") or [])[:8]),
+        "products_sampled": (f"{sample['products']} products from {sample.get('collections', 0)} collections"
+                             if sample.get("products") else None),
+        "price_min": money(data.get("price_min")),
+        "price_max": money(data.get("price_max")),
+        "price_median": money(data.get("price_median")),
+        "currency": currency,
+        "has_discounts": yes_no(data.get("has_discounts")),
+        "announcement_bar": (data.get("announcement_bar_text") or "")[:150],
+        "has_popup": yes_no(data.get("has_popup")),
+        "has_email_capture": yes_no(data.get("has_email_capture")),
+        "has_loyalty": yes_no(data.get("has_loyalty_program")),
+        "has_referral": yes_no(data.get("has_referral_program")),
+        "free_shipping_threshold": (None if threshold is None else
+                                    "free on every order" if threshold == 0 else money(threshold)),
+        "return_days": str(ret["return_days"]) if ret.get("return_days") else None,
+        "free_returns": yes_no(ret.get("free_returns")),
+        "review_platform": data.get("review_platform"),
+        "review_count": str(data["total_reviews"]) if data.get("total_reviews") is not None else None,
+        "payment_methods": ", ".join(data.get("payment_methods") or []),
+    }
+    return {name: values[name] for name in PROMPT_FIELDS if values[name] not in (None, "")}
+
+
+def build_prompt(data: Dict, language: str = "en"):
+    """(system, user, facts) for one store. One call asks for a positioning summary, three risks and
+    three opportunities, each citing a listed field as [field: value]. The section headings stay in
+    English whatever the language, so the parser can find them."""
+    facts = prompt_facts(data)
+    system = ("You are a competitive analyst helping a small online seller. You are given facts that a "
+              "scraper read from one competitor's storefront. Use only these facts: do not invent sales, "
+              "traffic, customer reviews or anything else that is not listed, and do not assume a value "
+              f"for a field that is not listed. Write in {LANGUAGE_NAMES.get(language, 'English')}.")
+    lines = [f"Facts read from the storefront of {facts.get('domain', 'this store')} "
+             "(a field that is not listed was not determined):", ""]
+    lines += [f"- {name}: {value}" for name, value in facts.items()]
+    lines += ["",
+              "Answer with exactly these three sections, with these English headings, and nothing else:",
+              "",
+              "## Positioning",
+              "Two or three sentences on how this store positions itself (price level, range, promise).",
+              "",
+              "## Risks",
+              "Three numbered items: where this store is strong, so a seller competing with it should "
+              "be careful.",
+              "",
+              "## Opportunities",
+              "Three numbered items: gaps a seller competing with it could use.",
+              "",
+              "The positioning text and every item must cite the fact it rests on in square brackets, "
+              "written [field: value] with a field name from the list above, for example "
+              f"[{next(iter(facts), 'domain')}: {next(iter(facts.values()), 'example.com')}]."]
+    return system, "\n".join(lines), facts
+
+
+_HEADING = re.compile(r"^\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(positioning|risks|opportunities)\s*:?\s*(?:\*\*)?\s*:?\s*$",
+                      re.I)
+_ITEM = re.compile(r"^\s*(?:\d+[.)]|[-*•])\s+(.*\S)\s*$")
+_CITATION = re.compile(r"\[\s*([A-Za-z_]+)\s*:\s*[^\]]+\]")
+
+
+def _check_citations(text: str, facts: Dict[str, str], where: str) -> None:
+    cited = _CITATION.findall(text)
+    if not cited:
+        raise AIError("parse", f"{where} cites no field")
+    unknown = sorted({name for name in cited if name not in facts})
+    if unknown:
+        raise AIError("parse", f"{where} cites fields the prompt did not list: {', '.join(unknown)}")
+
+
+def parse_analysis(text: str, facts: Dict[str, str]) -> Dict[str, Any]:
+    """{'positioning': str, 'risks': [3], 'opportunities': [3]} from the model's answer. Text outside
+    the three sections is ignored. Raises AIError('parse') when a section is missing or repeated, a
+    list does not have exactly three items, or the positioning text or an item cites no listed field
+    (a cut-off answer fails one of these)."""
+    body: Dict[str, List[str]] = {}
+    current = None
+    for line in (text or "").splitlines():
+        m = _HEADING.match(line)
+        if m:
+            current = m.group(1).lower()
+            if current in body:
+                raise AIError("parse", f"section {current} appears twice")
+            body[current] = []
+        elif current:
+            body[current].append(line)
+    missing = [s for s in SECTIONS if s not in body]
+    if missing:
+        raise AIError("parse", f"missing section(s): {', '.join(missing)}")
+
+    # positioning: the first paragraph under its heading
+    paragraph: List[str] = []
+    for line in body["positioning"]:
+        if line.strip():
+            paragraph.append(line.strip())
+        elif paragraph:
+            break
+    positioning = " ".join(paragraph)
+    _check_citations(positioning, facts, "positioning")
+
+    result: Dict[str, Any] = {"positioning": positioning}
+    for section in ("risks", "opportunities"):
+        items: List[str] = []
+        previous_was_item = False
+        for line in body[section]:
+            m = _ITEM.match(line)
+            if m:
+                items.append(m.group(1))
+                previous_was_item = True
+            elif previous_was_item and line[:1].isspace() and line.strip():
+                items[-1] += " " + line.strip()   # an item wrapped onto an indented line
+            else:
+                previous_was_item = False
+        if len(items) != 3:
+            raise AIError("parse", f"{section} has {len(items)} items, expected 3")
+        for i, item in enumerate(items, 1):
+            _check_citations(item, facts, f"{section} item {i}")
+        result[section] = items
+    return result
 
 
 @dataclass
@@ -288,308 +455,33 @@ class AIConfig:
     """Configuration for AI analysis."""
     provider: str = "ollama"
     model: Optional[str] = None   # None: the provider's default model
-
-    # Analysis settings
-    enable_chinese_insights: bool = True
-    enable_competitive_analysis: bool = True
-
-
-class ChineseInsightGenerator:
-    """
-    Generate Chinese insights with the configured provider.
-    """
-
-    SYSTEM_PROMPT = """你是一位专业的跨境电商竞品分析师，专门帮助中国卖家分析美国DTC品牌。
-你的分析应该：
-1. 直接、实用、可操作
-2. 使用专业的电商术语
-3. 给出具体的数据支持
-4. 提供可立即执行的建议
-请用简洁的中文回答。"""
-
-    def __init__(self, client: LLMClient):
-        self.client = client
-
-    def generate_insights(self, intel_data: Dict) -> Dict[str, List[str]]:
-        """
-        Generate AI-powered Chinese insights from site intelligence.
-
-        Args:
-            intel_data: Dictionary with extracted site data
-
-        Returns:
-            Dictionary with 'key_insights', 'recommendations', 'analysis'
-        """
-        if not self.client.is_available():
-            obs.degraded("ai_analyzer.py:ChineseInsightGenerator.generate_insights", "external_api",
-                         "provider unavailable", fallback="template insights", stage="ai")
-            return self._fallback_insights(intel_data)
-
-        prompt = self._build_prompt(intel_data)
-        response = self.client.generate(prompt, self.SYSTEM_PROMPT)
-
-        if response:
-            return self._parse_response(response)
-        else:
-            obs.degraded("ai_analyzer.py:ChineseInsightGenerator.generate_insights", "external_api",
-                         "empty LLM response", fallback="template insights", stage="ai")
-            return self._fallback_insights(intel_data)
-
-    def _build_prompt(self, data: Dict) -> str:
-        """
-        Prompt from intel.to_dict(). Only fields the pipeline produces are used, and a line is
-        left out when its value is unknown (no 'N/A' placeholders). Shipping and return values
-        are read from the nested shipping_policy / return_policy.
-        """
-        ship = data.get('shipping_policy') or {}
-        ret = data.get('return_policy') or {}
-        yes_no = lambda v: None if v is None else ('是' if v else '否')
-        threshold = ship.get('free_shipping_threshold')
-        price_range = (f"${data['price_min']:g} - ${data['price_max']:g}"
-                       if data.get('price_min') is not None and data.get('price_max') is not None else None)
-        sections = [
-            ('基本信息', [
-                ('网站域名', data.get('domain')),
-                ('电商平台', data.get('platform')),
-                ('品牌名称', data.get('brand_name')),
-                ('品牌定位（页面原文）', f"“{data['brand_positioning']}”" if data.get('brand_positioning') else None),
-            ]),
-            ('产品与定价', [
-                ('产品品类', ', '.join((data.get('categories') or [])[:5]) or None),
-                ('价格区间', price_range),
-                ('中位价格', f"${data['price_median']:g}" if data.get('price_median') is not None else None),
-                ('货币', data.get('currency')),
-                ('有折扣促销', yes_no(data.get('has_discounts'))),
-            ]),
-            ('营销策略', [
-                ('公告栏内容', (data.get('announcement_bar_text') or '')[:100] or None),
-                ('有弹窗', yes_no(data.get('has_popup'))),
-                ('邮件订阅', yes_no(data.get('has_email_capture'))),
-                ('会员计划', yes_no(data.get('has_loyalty_program'))),
-                ('推荐计划', yes_no(data.get('has_referral_program'))),
-            ]),
-            ('物流与政策', [
-                ('免运费门槛', None if threshold is None else ('全场免运费' if threshold == 0 else f"${threshold:g}")),
-                ('退货天数', f"{ret['return_days']}天" if ret.get('return_days') else None),
-                ('免费退货', yes_no(ret.get('free_returns')) if ret else None),
-            ]),
-            ('信任要素', [
-                ('评论平台', data.get('review_platform')),
-                ('评论数量', data.get('total_reviews')),
-                ('支付方式', ', '.join((data.get('payment_methods') or [])[:5]) or None),
-            ]),
-        ]
-        lines = ["请分析以下美国电商网站的竞品情报数据（未列出的项目表示未采集到）：", ""]
-        for title, facts in sections:
-            present = [(label, value) for label, value in facts if value not in (None, '', [])]
-            if present:
-                lines.append(f"**{title}**")
-                lines += [f"- {label}: {value}" for label, value in present]
-                lines.append("")
-        lines += ["请提供：", "", "## 关键洞察（6-8条）", "针对这个竞品的核心竞争力和策略分析", "",
-                  "## 可复制的动作建议（3条）", "中国跨境卖家下周可以立即测试的具体行动", ""]
-        return "\n".join(lines)
-
-    def _parse_response(self, response: str) -> Dict[str, List[str]]:
-        """Parse LLM response into structured data."""
-        result = {
-            'key_insights': [],
-            'recommendations': [],
-            'threat_analysis': '',
-            'pricing_advice': '',
-            'raw_response': response
-        }
-
-        # Simple parsing - split by sections
-        sections = response.split('##')
-
-        for section in sections:
-            section = section.strip()
-            if not section:
-                continue
-
-            lines = section.split('\n')
-            title = lines[0].strip().lower()
-            content = '\n'.join(lines[1:]).strip()
-
-            if '关键洞察' in title or '洞察' in title:
-                # Extract bullet points
-                for line in content.split('\n'):
-                    line = line.strip()
-                    if line and (line.startswith('-') or line.startswith('•') or
-                                 line[0].isdigit()):
-                        # Clean up the line
-                        cleaned = line.lstrip('-•0123456789.').strip()
-                        if cleaned:
-                            result['key_insights'].append(cleaned)
-
-            elif '建议' in title or '动作' in title:
-                for line in content.split('\n'):
-                    line = line.strip()
-                    if line and (line.startswith('-') or line.startswith('•') or
-                                 line[0].isdigit()):
-                        cleaned = line.lstrip('-•0123456789.').strip()
-                        if cleaned:
-                            result['recommendations'].append(cleaned)
-
-            elif '威胁' in title or '评估' in title:
-                result['threat_analysis'] = content
-
-            elif '定价' in title:
-                result['pricing_advice'] = content
-
-        return result
-
-    def _fallback_insights(self, data: Dict) -> Dict[str, List[str]]:
-        """Generate template-based insights when AI is not available."""
-        price_min = data.get('price_min') or 0
-        price_max = data.get('price_max') or 0
-        return {
-            'key_insights': [
-                f"【平台】使用{data.get('platform', 'Unknown')}平台",
-                f"【价格】价格区间${price_min:.0f}-${price_max:.0f}",
-            ],
-            'recommendations': [
-                "建议启用Ollama获取AI智能分析",
-                "运行: ollama pull qwen2.5:7b",
-            ],
-            'threat_analysis': 'AI分析不可用，请安装Ollama',
-            'pricing_advice': 'AI分析不可用',
-            'ai_powered': False
-        }
-
-
-class CompetitiveAnalyzer:
-    """
-    Deep competitive analysis using LLM reasoning.
-    """
-
-    SYSTEM_PROMPT = """你是一位资深的电商竞争分析专家，擅长分析品牌定位、市场策略和竞争格局。
-请基于提供的数据进行深度分析，给出专业、具体的商业洞察。"""
-
-    def __init__(self, client: LLMClient):
-        self.client = client
-
-    def analyze_positioning(self, intel_data: Dict) -> str:
-        """Analyze brand positioning and market strategy."""
-        if not self.client.is_available():
-            obs.degraded("ai_analyzer.py:CompetitiveAnalyzer.analyze_positioning", "external_api",
-                         "provider unavailable", fallback="'AI分析不可用' string", stage="ai")
-            return "AI分析不可用"
-
-        facts = [
-            ('品牌', intel_data.get('brand_name')),
-            ('品牌定位（页面原文）', intel_data.get('brand_positioning')),
-            ('产品', ', '.join(intel_data.get('categories') or []) or None),
-            ('价格带', f"${intel_data['price_min']:.0f} - ${intel_data['price_max']:.0f}"
-             if intel_data.get('price_min') is not None and intel_data.get('price_max') is not None else None),
-            ('促销策略', intel_data.get('announcement_bar_text') or None),
-        ]
-        known = "\n".join(f"{label}: {value}" for label, value in facts if value)
-
-        prompt = f"""分析这个品牌的市场定位：
-
-{known}
-
-请分析：
-1. 目标客户群体
-2. 品牌定位（高端/中端/低端）
-3. 核心竞争优势
-4. 潜在弱点
-
-用简洁的中文回答，每点不超过2句话。"""
-
-        return self.client.generate(prompt, self.SYSTEM_PROMPT) or "分析失败"
-
-    def compare_competitors(self, intel_list: List[Dict]) -> str:
-        """Generate comparative analysis across multiple competitors."""
-        if not self.client.is_available() or len(intel_list) < 2:
-            return "需要至少2个竞品进行对比分析"
-
-        competitors_summary = "\n".join([
-            f"- {d.get('domain')}: {d.get('platform')}, ${(d.get('price_min') or 0):.0f}-${(d.get('price_max') or 0):.0f}"
-            for d in intel_list[:5]
-        ])
-
-        prompt = f"""对比分析以下竞品：
-
-{competitors_summary}
-
-请提供：
-1. 价格定位对比
-2. 营销策略差异
-3. 各自优劣势
-4. 市场机会点
-
-用表格或对比形式呈现。"""
-
-        return self.client.generate(prompt, self.SYSTEM_PROMPT) or "对比分析失败"
+    language: str = "en"          # the language the model is asked to write in
 
 
 class AIAnalyzer:
-    """
-    Runs the LLM calls for one site (insights, positioning).
-    """
+    """One LLM call per store: positioning, three risks, three opportunities."""
 
-    def __init__(self, config: AIConfig = None, provider=None):
+    def __init__(self, config: AIConfig = None, provider=None, language: Optional[str] = None):
         self.config = config or AIConfig()
         self.provider = provider or make_provider(self.config.provider, self.config.model)
         self.client = LLMClient(self.provider)
         self.model = self.provider.model
-
-        # Initialize components
-        self.insight_generator = ChineseInsightGenerator(self.client)
-        self.competitive_analyzer = CompetitiveAnalyzer(self.client)
+        self.language = language or self.config.language
         obs.event("ai", "success", kind="ai_init", provider=self.provider.name, model=self.model,
-                  ollama_importable=OLLAMA_AVAILABLE)
+                  language=self.language, ollama_importable=OLLAMA_AVAILABLE)
 
     def is_ai_available(self) -> bool:
         """Check if AI features are available."""
         return self.client.is_available()
 
     def analyze_site(self, intel_data: Dict) -> Dict[str, Any]:
-        """
-        Perform comprehensive AI analysis on a site.
-
-        Args:
-            intel_data: Site intelligence dictionary
-
-        Returns:
-            Dictionary with all AI analysis results
-        """
-        available = self.client.is_available()
-        results = {
-            'ai_available': available,
-            'provider': self.provider.name,
-            'model_used': self.model if available else None,
-        }
-
-        # Generate Chinese insights
-        if self.config.enable_chinese_insights:
-            results['insights'] = self.insight_generator.generate_insights(intel_data)
-            from_llm = 'raw_response' in results['insights']
-            results['insights_from_llm'] = from_llm
-            obs.note('ai_insights', results['insights'].get('key_insights'), 'ai' if from_llm else 'default',
-                     f"{self.provider.name} {self.model} response parsed by '##' headings" if from_llm
-                     else "template fallback (_fallback_insights)", stage='ai')
-
-        # Competitive positioning analysis
-        if self.config.enable_competitive_analysis:
-            results['positioning'] = self.competitive_analyzer.analyze_positioning(intel_data)
-            from_llm = results['positioning'] not in ("AI分析不可用", "分析失败")
-            results['positioning_from_llm'] = from_llm
-            obs.note('ai_positioning', results['positioning'], 'ai' if from_llm else 'default',
-                     f"{self.provider.name} {self.model} free text" if from_llm else "fixed failure string",
-                     stage='ai')
-
-        return results
-
-    def compare_sites(self, intel_list: List[Dict]) -> str:
-        """Generate comparative analysis across multiple sites."""
-        return self.competitive_analyzer.compare_competitors(intel_list)
-
-
-# Convenience function
-def create_analyzer(provider: str = "ollama", model: Optional[str] = None) -> AIAnalyzer:
-    """Create an AI analyzer for a provider (and model, else the provider's default)."""
-    return AIAnalyzer(AIConfig(provider=provider, model=model))
+        """{'provider', 'model'} plus the parsed sections, or plus 'error' (an obs error type) when
+        the call failed or its answer did not have the requested shape."""
+        system, user, facts = build_prompt(intel_data, self.language)
+        parsed = self.client.generate(user, system, parse=lambda text: parse_analysis(text, facts))
+        result: Dict[str, Any] = {"provider": self.provider.name, "model": self.model}
+        if parsed is None:
+            result["error"] = self.client.last_error or "unknown"
+        else:
+            result.update(parsed)
+        return result
