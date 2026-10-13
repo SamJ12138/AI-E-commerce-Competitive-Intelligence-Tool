@@ -1,5 +1,10 @@
 # E-commerce Competitive Intelligence Tool
 
+![A terminal running the tool on allbirds.com, then the business report it wrote](docs/demo.gif)
+
+*`python main.py --sites sites.txt --lang en` on allbirds.com (the fetching part at 8x), then the business report it wrote.*\
+*Rendered by [scripts/make_demo_video.py](scripts/make_demo_video.py) from one real scan on 2026-10-12, not recorded by hand ([MP4](docs/demo.mp4)).*
+
 Point it at competitor online stores and it writes a structured comparison of what each store
 shows a shopper: prices and discounts, shipping and return terms, promotions (announcement bar,
 email signup, popups, loyalty and referral programs), trust signals (review platform, payment
@@ -243,7 +248,8 @@ venv\Scripts\python -m pytest -q
   suite and refuses the commit if a test fails. CI runs the same suite on Ubuntu and Windows
   (`.github/workflows/ci.yml`).
 - Change history and findings: [docs/phase2.md](docs/phase2.md), [docs/phase3.md](docs/phase3.md),
-  [docs/phase4.md](docs/phase4.md), [docs/phase5.md](docs/phase5.md),
+  [docs/phase4.md](docs/phase4.md), [docs/phase5.md](docs/phase5.md), [docs/phase6.md](docs/phase6.md),
+  [docs/phase7.md](docs/phase7.md) (the demo video),
   [docs/observations.md](docs/observations.md).
 
 ## Limitations
