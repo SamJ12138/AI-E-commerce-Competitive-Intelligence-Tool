@@ -40,5 +40,5 @@ db_path: data/intel_cache.db
 # repository's .env file, which git ignores). Never put the key in this file.
 ai_provider:
 
-# Model for the provider (--ai-model). Empty: qwen2.5:7b for ollama, deepseek-chat for deepseek.
+# Model for the provider (--ai-model). Empty: qwen2.5:7b for ollama, deepseek-flash for deepseek.
 ai_model:

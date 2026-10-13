@@ -7,7 +7,7 @@ its parser, and runs it once on a stored allbirds scan. No store was fetched in 
 ## 1. Provider abstraction
 
 - Config key `ai_provider` (`ollama` or `deepseek`, no default) and `ai_model` (empty: `qwen2.5:7b`
-  for ollama, `deepseek-chat` for deepseek); `--ai-provider` / `--ai-model` on the command line win
+  for ollama, `deepseek-flash` for deepseek; see section 3); `--ai-provider` / `--ai-model` on the command line win
   over the file. `--ai` with no provider exits 1 with one line naming `ai_provider`, before anything
   is printed or fetched; an unknown provider, or deepseek without a key, exits 1 the same way. A
   provider set without `--ai` does nothing.
@@ -77,3 +77,35 @@ its parser, and runs it once on a stored allbirds scan. No store was fetched in 
   truncated; five shapes that must fail; one call per store; parse failures logged; labels in
   both reports and both languages); `tests/test_ai_fake_ollama.py` and `tests/test_ai_labels.py`
   rewritten for the one-call shape.
+
+## 3. One real run, and what it is worth
+
+- The owner put `DEEPSEEK_API_KEY` in `.env`. `GET /models` with it lists `deepseek-flash` and
+  `deepseek-v4-pro`; `deepseek-chat` (the model the brief named) is not offered, and DeepSeek's
+  pricing page does not list it. The owner asked for the flash model, so the default is now
+  `deepseek-flash`.
+- `scripts/ai_from_snapshot.py` rebuilds report.md, report.csv and business_report.md from the
+  scans stored in a database, with the AI step, and writes `ai_run.json` (scan time, the facts the
+  prompt listed, the call's run-log record). It fetches nothing. It ran on
+  `output/demo-video/run/data/intel_cache.db`, the allbirds.com scan of 2026-10-12 20:37 that the
+  demo video was made from. The committed allbirds sample comes from the 18:32 scan, whose
+  database was not kept.
+- First call (16:55 UTC): failed. DeepSeek turns thinking mode on unless told otherwise; the
+  hidden reasoning counts against `max_tokens`, used all 1500, and no answer came back
+  (`finish_reason: length`, 466 prompt tokens, 8.4 s). The parser rejected it as `parse`, as
+  designed, and the report said "AI analysis unavailable". Fix: requests send
+  `"thinking": {"type": "disabled"}`, and the run log also records `reasoning_tokens` and
+  `prompt_cache_hit_tokens`. The owner approved one more call.
+- Second call (16:57 UTC): success, 441 prompt tokens (0 cache hits), 470 completion tokens,
+  3.36 s. Cost at DeepSeek's published off-peak `deepseek-flash` rate ($0.15 per million input
+  tokens on a cache miss, $0.60 per million output tokens; the peak rate is double): $0.00035, plus
+  $0.00097 for the failed call, $0.0013 in all. Output, metadata and verdict:
+  [docs/sample/real/allbirds/ai-deepseek.md](sample/real/allbirds/ai-deepseek.md).
+- Verdict: mostly a restatement of the tables. It said one thing the tables do not: the store's
+  description promises "FREE shipping & returns" while its terms say free shipping over $100 and
+  paid returns, which the hand-read ground truth confirms. It made two errors, each with a
+  correct citation: it took the 50-product sample for the size of the catalogue, and called a
+  store with 1 of 50 products marked down a discounter (the prompt has only `has_discounts: yes`).
+  The README says so.
+- The `live` test was not run: it would be a third paid call, and the two real calls exercise
+  the same code.

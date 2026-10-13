@@ -143,7 +143,7 @@ def test_parser_rejects_responses_that_do_not_fit(bad):
 # --- analyzer: one call, parse failures logged ------------------------------------------------
 
 class FakeProvider:
-    name, model = "deepseek", "deepseek-chat"
+    name, model = "deepseek", "deepseek-flash"
 
     def __init__(self, text, finish_reason="stop"):
         self.text, self.finish_reason, self.calls = text, finish_reason, []
@@ -173,7 +173,7 @@ def test_analyzer_makes_one_call_and_returns_the_sections(run_log):
     provider = FakeProvider(CLEAN)
     out = ai_analyzer.AIAnalyzer(provider=provider, language="en").analyze_site(DATA)
     assert len(provider.calls) == 1
-    assert (out["provider"], out["model"]) == ("deepseek", "deepseek-chat")
+    assert (out["provider"], out["model"]) == ("deepseek", "deepseek-flash")
     assert len(out["risks"]) == 3 and "error" not in out
     (e,) = _calls(run_log())
     assert e["event"] == "success" and e["context"]["prompt_tokens"] == 400
@@ -182,7 +182,7 @@ def test_analyzer_makes_one_call_and_returns_the_sections(run_log):
 @pytest.mark.parametrize("text,finish", [(TRUNCATED, "stop"), (CLEAN, "length")])
 def test_a_response_that_does_not_fit_is_logged_as_parse(run_log, text, finish):
     out = ai_analyzer.AIAnalyzer(provider=FakeProvider(text, finish), language="en").analyze_site(DATA)
-    assert out == {"provider": "deepseek", "model": "deepseek-chat", "error": "parse"}
+    assert out == {"provider": "deepseek", "model": "deepseek-flash", "error": "parse"}
     (e,) = _calls(run_log())
     assert (e["event"], e["error_type"]) == ("fail", "parse")
     assert (e["context"]["prompt_tokens"], e["context"]["completion_tokens"]) == (400, 200)
@@ -206,20 +206,20 @@ def _reports(tmp_path, intel, lang="en", **run):
     from modules.report_writer import ReportWriter
     md, _ = ReportWriter(str(tmp_path), language=lang).write_full_report([intel], {}, "report")
     run_info = dict({"ignore_robots": False, "render_js": False, "ai_requested": True, "ai_available": True,
-                     "ai_provider": "deepseek", "ai_model": "deepseek-chat"}, **run)
+                     "ai_provider": "deepseek", "ai_model": "deepseek-flash"}, **run)
     biz = BusinessReportGenerator(str(tmp_path), language=lang).generate_report(
         [intel], {}, {}, "business_report", run_info=run_info)
     return Path(md).read_text(encoding="utf-8"), Path(biz).read_text(encoding="utf-8")
 
 
-PARSED = dict(ai_analyzer.parse_analysis(CLEAN, _facts()), provider="deepseek", model="deepseek-chat")
+PARSED = dict(ai_analyzer.parse_analysis(CLEAN, _facts()), provider="deepseek", model="deepseek-flash")
 
 
 @pytest.mark.parametrize("lang", ["en", "zh"])
 def test_both_reports_label_the_ai_section_with_provider_and_model(tmp_path, lang):
     md, biz = _reports(tmp_path, _intel(PARSED), lang)
     for text in (md, biz):
-        assert "deepseek / deepseek-chat" in text
+        assert "deepseek / deepseek-flash" in text
         assert "[free_shipping_threshold: $100]" in text and "Entry products start at $14" in text
     # the rule-based insights are still there; the AI section is added, not swapped in
     assert ("Key Insights" if lang == "en" else "关键洞察") in md
@@ -228,7 +228,7 @@ def test_both_reports_label_the_ai_section_with_provider_and_model(tmp_path, lan
 def test_methodology_says_the_scan_text_was_sent_to_the_provider(tmp_path):
     _, biz = _reports(tmp_path, _intel(PARSED))
     method = biz.split("### Methodology", 1)[1]
-    assert "sent to DeepSeek" in method and "deepseek-chat" in method
+    assert "sent to DeepSeek" in method and "deepseek-flash" in method
     _, biz = _reports(tmp_path, _intel(dict(PARSED, provider="ollama", model="qwen2.5:7b")),
                       ai_provider="ollama", ai_model="qwen2.5:7b")
     method = biz.split("### Methodology", 1)[1]
@@ -237,9 +237,9 @@ def test_methodology_says_the_scan_text_was_sent_to_the_provider(tmp_path):
 
 @pytest.mark.parametrize("lang,word", [("en", "AI analysis unavailable"), ("zh", "AI 分析不可用")])
 def test_a_failed_analysis_says_unavailable_and_prints_no_text(tmp_path, lang, word):
-    md, biz = _reports(tmp_path, _intel({"provider": "deepseek", "model": "deepseek-chat", "error": "parse"}), lang)
+    md, biz = _reports(tmp_path, _intel({"provider": "deepseek", "model": "deepseek-flash", "error": "parse"}), lang)
     for text in (md, biz):
-        assert word in text and "deepseek / deepseek-chat" in text
+        assert word in text and "deepseek / deepseek-flash" in text
         assert "## Risks" not in text
 
 

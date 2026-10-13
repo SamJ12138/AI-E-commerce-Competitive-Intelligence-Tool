@@ -3,12 +3,12 @@ ai_analyzer.py - The optional LLM step (--ai), off unless a provider is configur
 
 Providers (config key ai_provider):
 - ollama: a local model served by Ollama (default model qwen2.5:7b). Nothing leaves the machine.
-- deepseek: DeepSeek's OpenAI-compatible chat completions API (default model deepseek-chat),
+- deepseek: DeepSeek's OpenAI-compatible chat completions API (default model deepseek-flash),
   called with requests. The key is read from DEEPSEEK_API_KEY (environment, else the repo's .env)
   and is never printed or logged.
 
 Every call writes one run-log event (stage "ai", kind "ai_call"): provider, model, prompt and
-completion tokens, latency, and on failure error_type (auth, rate_limit, timeout, parse, http,
+completion tokens (and DeepSeek's cache-hit prompt tokens), latency, and on failure error_type (auth, rate_limit, timeout, parse, http,
 external_api). The prompt text and the key are never logged.
 
 This is the only part of the tool that is AI. The competitive pressure score is
@@ -37,7 +37,7 @@ except ImportError:  # obs: import-time, reported by OllamaProvider.is_available
     OLLAMA_AVAILABLE = False
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_MODELS = {"ollama": "qwen2.5:7b", "deepseek": "deepseek-chat"}
+DEFAULT_MODELS = {"ollama": "qwen2.5:7b", "deepseek": "deepseek-flash"}
 PROVIDERS = tuple(DEFAULT_MODELS)
 KEY_VARIABLES = {"deepseek": "DEEPSEEK_API_KEY"}
 
@@ -76,6 +76,8 @@ class ChatResult:
     completion_tokens: Optional[int] = None
     finish_reason: Optional[str] = None
     retries: int = 0
+    cache_hit_tokens: Optional[int] = None   # DeepSeek: prompt tokens billed at the cache-hit rate
+    reasoning_tokens: Optional[int] = None   # DeepSeek: completion tokens spent on hidden reasoning
 
 
 def _get(obj: Any, key: str) -> Any:
@@ -180,6 +182,9 @@ class DeepSeekProvider:
 
     A 429 is retried once, after Retry-After seconds (default 2, at most 20). 401/403 is auth, a
     second 429 is rate_limit, a body that is not a chat completion is parse.
+
+    Thinking mode is switched off (DeepSeek turns it on by default): its hidden reasoning counts
+    against max_tokens, and on the first real run it used all 1500 and no answer came back.
     """
 
     name = "deepseek"
@@ -204,7 +209,8 @@ class DeepSeekProvider:
     def chat(self, system: Optional[str], user: str) -> ChatResult:
         messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
         payload = {"model": self.model, "messages": messages, "stream": False,
-                   "temperature": self.temperature, "max_tokens": self.max_tokens}
+                   "temperature": self.temperature, "max_tokens": self.max_tokens,
+                   "thinking": {"type": "disabled"}}
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
         for attempt in (0, 1):
             response = self.session.post(self.URL, json=payload, headers=headers, timeout=self.timeout)
@@ -229,7 +235,9 @@ class DeepSeekProvider:
         usage = body.get("usage") or {}
         return ChatResult(text=text, prompt_tokens=usage.get("prompt_tokens"),
                           completion_tokens=usage.get("completion_tokens"),
-                          finish_reason=choice.get("finish_reason"), retries=attempt)
+                          finish_reason=choice.get("finish_reason"), retries=attempt,
+                          cache_hit_tokens=usage.get("prompt_cache_hit_tokens"),
+                          reasoning_tokens=(usage.get("completion_tokens_details") or {}).get("reasoning_tokens"))
 
     @staticmethod
     def _retry_after(response) -> float:
@@ -259,6 +267,7 @@ class LLMClient:
         self.provider = provider
         self.model = provider.model
         self.last_error: Optional[str] = None
+        self.last_call: Optional[Dict[str, Any]] = None   # what the last call logged (no prompt, no key)
 
     def is_available(self) -> bool:
         return self.provider.is_available()
@@ -267,7 +276,7 @@ class LLMClient:
         """The model's text, or parse(text) when parse is given; None when the call failed or the
         text did not parse (logged with its error_type, also kept in last_error). A response cut
         off at the token limit is a parse failure."""
-        self.last_error = None
+        self.last_error = self.last_call = None
         if not self.is_available():
             self.last_error = "external_api"
             return None
@@ -280,20 +289,31 @@ class LLMClient:
                 raise AIError("parse", "response cut off at the token limit")
             value = parse(result.text) if parse else result.text
         except Exception as exc:
-            latency = round((time.perf_counter() - started) * 1000, 2)
             message = str(exc) if isinstance(exc, AIError) else type(exc).__name__
             self.last_error = error_type_of(exc)
-            obs.event("ai", "fail", duration_ms=latency, error_type=self.last_error, error_message=message,
-                      latency_ms=latency, prompt_tokens=result.prompt_tokens if result else None,
-                      completion_tokens=result.completion_tokens if result else None,
-                      finish_reason=result.finish_reason if result else None, **context)
+            fields = self._record("fail", started, result, context, error_type=self.last_error,
+                                  error_message=message)
+            obs.event("ai", "fail", duration_ms=fields["latency_ms"], error_type=self.last_error,
+                      error_message=message, **fields)
             logger.error(f"{self.provider.name} call failed: {message}")
             return None
-        latency = round((time.perf_counter() - started) * 1000, 2)
-        obs.event("ai", "success", duration_ms=latency, latency_ms=latency, prompt_tokens=result.prompt_tokens,
-                  completion_tokens=result.completion_tokens, finish_reason=result.finish_reason,
-                  retries=result.retries, **context)
+        fields = self._record("success", started, result, context)
+        obs.event("ai", "success", duration_ms=fields["latency_ms"], **fields)
         return value
+
+    def _record(self, event: str, started: float, result: Optional[ChatResult], context: Dict[str, Any],
+                error_type: Optional[str] = None, error_message: Optional[str] = None) -> Dict[str, Any]:
+        """The run-log fields of one call (no prompt, no key); also kept in last_call."""
+        latency = round((time.perf_counter() - started) * 1000, 2)
+        fields = dict(context, latency_ms=latency,
+                      prompt_tokens=result.prompt_tokens if result else None,
+                      prompt_cache_hit_tokens=result.cache_hit_tokens if result else None,
+                      completion_tokens=result.completion_tokens if result else None,
+                      reasoning_tokens=result.reasoning_tokens if result else None,
+                      finish_reason=result.finish_reason if result else None,
+                      retries=result.retries if result else None)
+        self.last_call = dict(fields, event=event, error_type=error_type, error_message=error_message)
+        return fields
 
 
 # The prompt's facts, named as report.csv names them. Only these can be cited.

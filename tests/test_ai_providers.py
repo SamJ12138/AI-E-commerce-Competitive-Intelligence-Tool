@@ -16,10 +16,12 @@ from modules import ai_analyzer, obs
 REPO = Path(__file__).resolve().parent.parent
 KEY = "sk-TEST-SECRET-0123456789"
 PROMPT_MARK = "PROMPT-SENTINEL-7f3a"
-COMPLETION = {"id": "x", "object": "chat.completion", "model": "deepseek-chat",
+COMPLETION = {"id": "x", "object": "chat.completion", "model": "deepseek-flash",
               "choices": [{"index": 0, "finish_reason": "stop",
                            "message": {"role": "assistant", "content": "MODEL-ANSWER"}}],
-              "usage": {"prompt_tokens": 123, "completion_tokens": 45, "total_tokens": 168}}
+              "usage": {"prompt_tokens": 123, "completion_tokens": 45, "total_tokens": 168,
+                        "prompt_cache_hit_tokens": 100, "prompt_cache_miss_tokens": 23,
+                        "completion_tokens_details": {"reasoning_tokens": 7}}}
 
 
 class FakeTransport(requests.adapters.BaseAdapter):
@@ -84,13 +86,18 @@ def test_success_posts_one_chat_completion_and_logs_tokens(run_log):
     assert req.method == "POST" and req.url == "https://api.deepseek.com/chat/completions"
     assert req.headers["Authorization"] == f"Bearer {KEY}"
     body = json.loads(req.body)
-    assert body["model"] == "deepseek-chat" and body["stream"] is False
+    assert body["model"] == "deepseek-flash" and body["stream"] is False
+    # thinking is on by default on DeepSeek and its hidden reasoning counts against max_tokens: the
+    # first real run spent all 1500 tokens reasoning and returned no answer
+    assert body["thinking"] == {"type": "disabled"}
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
     (e,) = _ai_calls(run_log())
     assert e["event"] == "success" and e["error_type"] is None
     ctx = e["context"]
-    assert (ctx["provider"], ctx["model"]) == ("deepseek", "deepseek-chat")
+    assert (ctx["provider"], ctx["model"]) == ("deepseek", "deepseek-flash")
     assert (ctx["prompt_tokens"], ctx["completion_tokens"]) == (123, 45)
+    assert ctx["prompt_cache_hit_tokens"] == 100     # billed at the cache-hit rate
+    assert ctx["reasoning_tokens"] == 7
     assert ctx["latency_ms"] >= 0 and e["duration_ms"] == ctx["latency_ms"]
     _no_secrets(run_log())
 
@@ -101,7 +108,7 @@ def test_401_is_auth_and_not_retried(run_log):
     assert len(transport.requests) == 1
     (e,) = _ai_calls(run_log())
     assert (e["event"], e["error_type"]) == ("fail", "auth")
-    assert e["context"]["provider"] == "deepseek" and e["context"]["model"] == "deepseek-chat"
+    assert e["context"]["provider"] == "deepseek" and e["context"]["model"] == "deepseek-flash"
     assert KEY[-4:] not in json.dumps(e)   # the response body is not logged
     _no_secrets(run_log())
 

@@ -69,7 +69,7 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 | `--render-js` | Load pages in a headless browser so prices and menus drawn by JavaScript are seen. Run `venv\Scripts\python -m playwright install chromium` once first. Slower. |
 | `--ai` | Add text written by a language model (see below). Needs a provider. |
 | `--ai-provider` | `ollama` (local) or `deepseek` (DeepSeek's API); config key `ai_provider`, no default. |
-| `--ai-model` | The model for `--ai` (default `qwen2.5:7b` for ollama, `deepseek-chat` for deepseek). |
+| `--ai-model` | The model for `--ai` (default `qwen2.5:7b` for ollama, `deepseek-flash` for deepseek). |
 | `--monitor` | Compare each store with its previous scan and report what changed. |
 | `--max-pages`, `--max-products` | Pages read and products collected per store (defaults 20 and 50). |
 | `--max-per-collection` | Products taken from one collection page (default 10), so one big collection does not fill the sample. When every page is read and the sample is still under `--max-products`, it is topped up from the collection pages already read. |
@@ -78,17 +78,9 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 | `--ignore-robots` | Ignore robots.txt rules and Crawl-delay. Only for sites you own or have permission to crawl. |
 | `--verbose` | Debug logging. |
 
-**`--ai` (optional).** Install [Ollama](https://ollama.com), run `ollama pull qwen2.5:7b`, and
-add `--ai --ai-provider ollama`. For every store that was read, the local model writes key insights, recommendations
-and a brand-positioning paragraph; they appear in `report.md` under headings marked "(AI)". The
-model's text is in Chinese whatever `--lang` says. Nothing is sent to a cloud service. Without
-`--ai`, or when Ollama is not running (a warning says so), all text is rule-based and the
-business report says the LLM step did not run.
-
-The `--ai` step is implemented but has not been verified with a real model: Ollama was not
-installed on the machine this was developed on. It is tested end to end against a fake Ollama
-client (`tests/test_ai_fake_ollama.py`: what the model is asked, and where its answer appears in
-the reports), not for the quality of what a real model writes.
+**`--ai` (optional, off by default).** Adds a language model's positioning summary, three risks
+and three opportunities per store. It needs a provider, and with DeepSeek the scanned values
+leave your machine: see [What "AI" means here](#what-ai-means-here) before turning it on.
 
 **Monitor mode and change detection.** Every scan is stored in `data/intel_cache.db`. With
 `--monitor`, each store is compared with the newest earlier scan of the same store and `report.md`
@@ -113,7 +105,10 @@ fields are guessed. Every step and when a store ends as blocked or unreachable:
 **Responsible use.** Check each site's terms of service before you scan it; some forbid automated
 access whatever their robots.txt says. Keep the delays: do not lower `rate_limit_delay` or pass
 `--ignore-robots` for sites that are not yours. Scan competitors for your own analysis; do not use
-the tool to collect data for resale. You are responsible for how you use it.
+the tool to collect data for resale. You are responsible for how you use it. Scans stay on your
+machine unless you run `--ai` with `ai_provider: deepseek`: then each store's scanned values (the
+fields listed in the prompt, no page HTML) are sent to DeepSeek's API and fall under DeepSeek's
+terms. Keep the API key in `.env` only, never in `config.yaml` or a file you commit.
 
 ## Accuracy
 
@@ -199,9 +194,40 @@ that run colour and price together, see [docs/observations.md](docs/observations
 
 ## What "AI" means here
 
-Only the optional `--ai` step uses a model: a language model running locally under Ollama writes
-insight and recommendation text. Everything else is rules: regular expressions, HTML selectors and
-fixed thresholds.
+Only the optional `--ai` step uses a model. Everything else is rules: regular expressions, HTML
+selectors and fixed thresholds.
+
+**The `--ai` step is off by default.** It runs only when you pass `--ai` and name a provider,
+with `ai_provider` in the config file or `--ai-provider`; `--ai` without one stops with an error.
+There are two providers:
+
+| provider | model (default) | what leaves your machine |
+|---|---|---|
+| `ollama` | `qwen2.5:7b`, served by a local [Ollama](https://ollama.com) | nothing |
+| `deepseek` | `deepseek-flash`, through DeepSeek's API | each store's scanned values, sent to api.deepseek.com |
+
+For DeepSeek, put `DEEPSEEK_API_KEY=...` in a `.env` file in the repository folder (git ignores
+it) or in the environment. The key is never printed or written to the run log. What is sent is
+the list of fields the scan determined for the store (domain, platform, the store's own
+description, categories, prices, discount/email/loyalty/referral flags, shipping and return
+terms, review platform, payment methods) and the instructions. No page HTML, nothing about you,
+and no field the scan did not determine.
+
+For each store that was read, the model is asked once for a positioning summary, three risks and
+three opportunities, in the report language, each citing the field it rests on as `[field: value]`.
+An answer without that shape is rejected and the report says "AI analysis unavailable". The
+section is added after the rule-based insights, labelled with provider and model, and the business
+report's methodology says where the data was sent. The run log records provider, model, tokens,
+latency and the error type of a failed call.
+
+**Sample output, and whether it helps.** [docs/sample/real/allbirds/ai-deepseek.md](docs/sample/real/allbirds/ai-deepseek.md)
+is one DeepSeek run on a stored allbirds.com scan: 441 prompt and 470 completion tokens, 3.4 s,
+$0.00035. It mostly restates the tables in sentences. One point is new: the store's own
+description promises "FREE shipping & returns" while its terms say free shipping over $100 and
+paid returns. Two points are wrong: it takes the tool's 50-product sample for the size of the
+catalogue, and calls a store with 1 of 50 products marked down a discounter. Use it as a prompt to
+look again at the tables, not as analysis. The Ollama path has been tested only against a fake
+client, never with a real model.
 
 The competitive pressure score in `report.md` is a fixed rubric, not a model. Each of six factors
 gets 0 to 10 by a fixed rule, and the score is the weighted sum rounded and clamped to 1-10.
@@ -225,9 +251,10 @@ venv\Scripts\python -m pip install -r requirements-dev.txt
 venv\Scripts\python -m pytest -q
 ```
 
-- **Tests** (`tests/`, about a minute) run against local servers only; no test touches the
-  internet. The fixture run with `--render-js` runs only with `ECI_TEST_RENDER_JS=1` (it needs
-  `playwright install chromium`).
+- **Tests** (`tests/`, about a minute and a half) run against local servers only; no test touches
+  the internet. The fixture run with `--render-js` runs only with `ECI_TEST_RENDER_JS=1` (it needs
+  `playwright install chromium`). The one test marked `live` calls DeepSeek and runs only when
+  `DEEPSEEK_API_KEY` is set in the environment (a key in `.env` alone does not run it).
 - **Fixture stores**: `tests/fixtures/stores/<store>/` holds the pages and `fixtures.json` the true
   values; `python tests/fixtures/stores/server.py` serves all three on 127.0.0.1.
 - **`scripts/score_fixtures.py`** runs `main.py` on each fixture store and scores every field
@@ -245,12 +272,14 @@ venv\Scripts\python -m pytest -q
   scrolled in headless Chromium, then a closing card. Each run scans the store once; the
   recording is kept, so the video can be rendered again without a new scan (see the script's
   docstring).
+- **`scripts/ai_from_snapshot.py`** rebuilds the reports from scans stored in a database with
+  the `--ai` step, without fetching anything; it made the DeepSeek sample.
 - **Pre-commit hook**: `python scripts/install-hooks.py` installs a hook that runs the full test
   suite and refuses the commit if a test fails. CI runs the same suite on Ubuntu and Windows
   (`.github/workflows/ci.yml`).
 - Change history and findings: [docs/phase2.md](docs/phase2.md), [docs/phase3.md](docs/phase3.md),
   [docs/phase4.md](docs/phase4.md), [docs/phase5.md](docs/phase5.md), [docs/phase6.md](docs/phase6.md),
-  [docs/phase7.md](docs/phase7.md) (the demo video),
+  [docs/phase7.md](docs/phase7.md) (the demo video), [docs/phase8.md](docs/phase8.md) (AI providers),
   [docs/observations.md](docs/observations.md).
 
 ## Limitations
@@ -271,8 +300,9 @@ venv\Scripts\python -m pytest -q
   check out.
 - A store skipped because of robots.txt is not in the reports (the console and the run log say
   why).
-- The `--ai` text is always in Chinese and needs a local Ollama install; the step has been tested
-  only against a fake Ollama client.
+- The `--ai` text is checked for shape and for citing real fields, not for being right (see the
+  sample above). The DeepSeek path has run once on one real store; the Ollama path only against a
+  fake client.
 
 ## License
 

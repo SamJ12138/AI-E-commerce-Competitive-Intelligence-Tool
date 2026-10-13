@@ -946,7 +946,7 @@ def resolve_ai(ai: bool, provider: Optional[str], model: Optional[str], config_d
 @click.option('--ai-provider', type=click.Choice(['ollama', 'deepseek']), default=None,
               help='LLM provider for --ai (config key ai_provider; no default)')
 @click.option('--ai-model', default=None,
-              help='Model for --ai (default: qwen2.5:7b for ollama, deepseek-chat for deepseek)')
+              help='Model for --ai (default: qwen2.5:7b for ollama, deepseek-flash for deepseek)')
 @click.option('--lang', '-l', type=click.Choice(['en', 'zh']), default='zh', help='Report language: en=English, zh=Chinese (default)')
 def main(
     sites: str,
