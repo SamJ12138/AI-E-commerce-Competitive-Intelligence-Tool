@@ -7,6 +7,13 @@ other files in this folder come from an earlier scan the same day (18:32), whose
 kept, so a few values differ (for example, that report lists a popup and this scan's value for it
 is unknown).
 
+> **The prompt was changed after this run; this sample reflects the earlier prompt.** Two of the
+> errors below came from what the prompt left out. It gave only `has_discounts: yes`, and the
+> model called a store with 1 of 50 sampled products marked down a discounter. It gave only the
+> sample size, and the model took the sample for the catalogue. The prompt now also lists
+> `discounted_products` ("1 of 50 sampled" for this scan) and says the products are a sample of up
+> to 10 per collection page, not the full catalogue. The model has not been run on the new prompt.
+
 | | |
 |---|---|
 | provider / model | DeepSeek / `deepseek-flash` (thinking mode off) |

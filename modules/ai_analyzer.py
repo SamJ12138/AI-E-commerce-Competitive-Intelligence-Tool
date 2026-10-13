@@ -319,7 +319,8 @@ class LLMClient:
 # The prompt's facts, named as report.csv names them. Only these can be cited.
 PROMPT_FIELDS = (
     "domain", "platform", "brand_name", "brand_positioning", "categories", "products_sampled",
-    "price_min", "price_max", "price_median", "currency", "has_discounts", "announcement_bar",
+    "price_min", "price_max", "price_median", "currency", "has_discounts", "discounted_products",
+    "announcement_bar",
     "has_popup", "has_email_capture", "has_loyalty", "has_referral", "free_shipping_threshold",
     "return_days", "free_returns", "review_platform", "review_count", "payment_methods",
 )
@@ -344,6 +345,10 @@ def prompt_facts(data: Dict) -> Dict[str, str]:
 
     sample = data.get("product_sample") or {}
     threshold = ship.get("free_shipping_threshold")
+    # how many of the priced products in the sample are marked down (has_discounts alone made a
+    # store with 1 of 50 marked down read as a discounter)
+    priced = [p for p in data.get("all_products") or [] if (p.get("price") or {}).get("current_price")]
+    on_sale = [p for p in priced if p["price"].get("is_on_sale")]
     values = {
         "domain": data.get("domain"),
         "platform": data.get("platform"),
@@ -357,6 +362,7 @@ def prompt_facts(data: Dict) -> Dict[str, str]:
         "price_median": money(data.get("price_median")),
         "currency": currency,
         "has_discounts": yes_no(data.get("has_discounts")),
+        "discounted_products": f"{len(on_sale)} of {len(priced)} sampled" if priced else None,
         "announcement_bar": (data.get("announcement_bar_text") or "")[:150],
         "has_popup": yes_no(data.get("has_popup")),
         "has_email_capture": yes_no(data.get("has_email_capture")),
@@ -385,6 +391,12 @@ def build_prompt(data: Dict, language: str = "en"):
     lines = [f"Facts read from the storefront of {facts.get('domain', 'this store')} "
              "(a field that is not listed was not determined):", ""]
     lines += [f"- {name}: {value}" for name, value in facts.items()]
+    sample = data.get("product_sample") or {}
+    if sample.get("products") or "discounted_products" in facts:
+        # the model took the sample for the catalogue when the prompt only gave its size
+        per = f" of up to {sample['per_collection']} per collection page" if sample.get("per_collection") else ""
+        lines += ["", f"The products are a sample{per}, not the full catalogue: products_sampled, the prices "
+                      "and discounted_products describe that sample only."]
     lines += ["",
               "Answer with exactly these three sections, with these English headings, and nothing else:",
               "",

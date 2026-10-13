@@ -109,3 +109,16 @@ its parser, and runs it once on a stored allbirds scan. No store was fetched in 
   The README says so.
 - The `live` test was not run: it would be a third paid call, and the two real calls exercise
   the same code.
+
+## 4. Prompt fix for the two misreadings
+
+- The prompt gains `discounted_products` ("k of n sampled": products shown with a compare-at
+  price among the priced products in the sample, the count the rule-based "Discounts" line
+  uses) and, when there is a product sample, the line "The products are a sample of up to N per
+  collection page, not the full catalogue: products_sampled, the prices and discounted_products
+  describe that sample only." For the allbirds scan: "1 of 50 sampled", N = 10.
+- Test: `tests/test_ai_prompt.py` builds the prompt from the committed allbirds scan
+  (`docs/real-corpus/allbirds-scan-2026-10-12.json`, the 18:32 scan, converted to the
+  `intel.to_dict()` shape; it also has 1 of 50 marked down) and asserts both strings.
+- No paid call: the DeepSeek sample is from the earlier prompt, and
+  `docs/sample/real/allbirds/ai-deepseek.md` now says so.

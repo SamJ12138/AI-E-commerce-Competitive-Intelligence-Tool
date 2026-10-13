@@ -247,3 +247,36 @@ def test_no_ai_section_without_the_step(tmp_path):
     md, biz = _reports(tmp_path, _intel(), ai_requested=False, ai_available=False)
     assert "deepseek" not in md and "AI analysis" not in md
     assert "LLM step was not run" in biz
+
+
+# --- the allbirds run's two misreadings, closed in the prompt ---------------------------------
+
+def _allbirds_scan_dict():
+    """intel.to_dict()-shaped dict from the committed allbirds scan (docs/real-corpus), whose
+    products are stored flat as {price, compare_at}."""
+    scan = json.loads((Path(__file__).resolve().parent.parent / "docs" / "real-corpus" /
+                       "allbirds-scan-2026-10-12.json").read_text(encoding="utf-8"))
+    products = [{"title": p["title"], "price": {
+        "currency": scan["currency"], "current_price": p["price"], "compare_at_price": p["compare_at"],
+        "is_on_sale": bool(p["compare_at"] and p["price"] and p["compare_at"] > p["price"])}}
+        for p in scan["products"]]
+    return {"domain": "allbirds.com", "platform": "Shopify", "currency": scan["currency"],
+            "price_min": scan["price_min"], "price_max": scan["price_max"], "price_median": scan["price_median"],
+            "has_discounts": scan["has_discounts"], "all_products": products,
+            "product_sample": scan["product_sample"], "categories": scan["categories"],
+            "shipping_policy": {"free_shipping_threshold": scan["free_shipping_threshold"]},
+            "return_policy": {"return_days": scan["return_days"], "free_returns": scan["free_returns"]}}
+
+
+def test_prompt_says_how_many_sampled_products_are_discounted_and_what_the_sample_is():
+    # The DeepSeek run on allbirds called a store with 1 of 50 products marked down a discounter
+    # (it had only has_discounts: yes) and took the 50-product sample for the catalogue.
+    _, user, facts = ai_analyzer.build_prompt(_allbirds_scan_dict(), "en")
+    assert facts["discounted_products"] == "1 of 50 sampled"
+    assert "- discounted_products: 1 of 50 sampled" in user
+    assert ("The products are a sample of up to 10 per collection page, not the full catalogue" in user)
+
+
+def test_no_sample_line_without_a_sample():
+    _, user, facts = ai_analyzer.build_prompt({"domain": "x"}, "en")
+    assert "discounted_products" not in facts and "not the full catalogue" not in user
