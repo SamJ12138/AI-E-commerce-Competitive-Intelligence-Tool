@@ -215,7 +215,7 @@ An unknown input scores 5 for price and shipping and counts as absent elsewhere.
 ## Development
 
 ```powershell
-venv\Scripts\python -m pip install pytest
+venv\Scripts\python -m pip install -r requirements-dev.txt
 venv\Scripts\python -m pytest -q
 ```
 
@@ -234,6 +234,11 @@ venv\Scripts\python -m pytest -q
 - **Run log**: every run writes `logs/run_<id>.jsonl`, one JSON event per stage, fetch and field,
   including the rule or selector that produced each value and every exception that was handled.
   `python scripts/failure_report.py` summarises the newest log.
+- **`scripts/make_demo_video.py`** renders `docs/demo.mp4` and `docs/demo.gif`: one real run of
+  `main.py` recorded from its output, replayed in a terminal emulator, then the business report
+  scrolled in headless Chromium, then a closing card. Each run scans the store once; the
+  recording is kept, so the video can be rendered again without a new scan (see the script's
+  docstring).
 - **Pre-commit hook**: `python scripts/install-hooks.py` installs a hook that runs the full test
   suite and refuses the commit if a test fails. CI runs the same suite on Ubuntu and Windows
   (`.github/workflows/ci.yml`).

@@ -47,5 +47,7 @@ def test_ci_workflow():
     uses = [step["uses"] for step in job["steps"] if "uses" in step]
     assert "actions/checkout@v5" in uses and "actions/setup-python@v6" in uses   # both run on Node 24
     runs = "\n".join(step.get("run", "") for step in job["steps"])
-    assert "pip install -r requirements.txt" in runs and "-m pytest" in runs
+    assert "pip install -r requirements-dev.txt" in runs and "-m pytest" in runs
+    dev = (REPO / "requirements-dev.txt").read_text(encoding="utf-8").splitlines()
+    assert "-r requirements.txt" in dev and any(line.startswith("pytest") for line in dev)
     assert True in wf or "on" in wf   # PyYAML reads the bare key `on` as True

@@ -1,0 +1,9 @@
+# Development: the test suite, and scripts/make_demo_video.py (the README demo video)
+-r requirements.txt
+pytest>=8.0
+
+# make_demo_video.py: terminal emulator that replays the recorded run, frame drawing,
+# and the ffmpeg binary (shipped inside the imageio-ffmpeg wheel)
+pyte>=0.8.2
+pillow>=10.1.0
+imageio-ffmpeg>=0.5.1

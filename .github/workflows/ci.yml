@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+          pip install -r requirements-dev.txt
 
       # Every test runs against the local fixture stores on 127.0.0.1; no real site is fetched.
       # The --render-js fixture run needs a browser and stays off (ECI_TEST_RENDER_JS unset).
