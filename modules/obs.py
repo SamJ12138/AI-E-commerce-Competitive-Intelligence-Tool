@@ -25,7 +25,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-ERROR_TYPES = ("input_invalid", "http", "blocked", "parse", "timeout", "external_api", "unknown")
+ERROR_TYPES = ("input_invalid", "http", "blocked", "parse", "timeout", "external_api", "auth", "rate_limit",
+               "unknown")
 EVENTS = ("start", "success", "fail", "skip")
 
 # Where a field value came from. The first five are the categories asked for;

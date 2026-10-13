@@ -10,6 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "fixtures" / "stores"))
 from server import STORE_NAMES, StoreServer  # noqa: E402
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "live: calls a real paid API; skips unless its key is set")
+
+
 @pytest.fixture(scope="session")
 def fixture_stores():
     """Start every fixture store once per session; yields {name: StoreServer}."""

@@ -67,8 +67,9 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 |---|---|
 | `--lang en` / `--lang zh` | Report language. The default is `zh` (Chinese). |
 | `--render-js` | Load pages in a headless browser so prices and menus drawn by JavaScript are seen. Run `venv\Scripts\python -m playwright install chromium` once first. Slower. |
-| `--ai` | Add text written by a local language model (see below). |
-| `--ai-model` | The Ollama model for `--ai` (default `qwen2.5:7b`). |
+| `--ai` | Add text written by a language model (see below). Needs a provider. |
+| `--ai-provider` | `ollama` (local) or `deepseek` (DeepSeek's API); config key `ai_provider`, no default. |
+| `--ai-model` | The model for `--ai` (default `qwen2.5:7b` for ollama, `deepseek-chat` for deepseek). |
 | `--monitor` | Compare each store with its previous scan and report what changed. |
 | `--max-pages`, `--max-products` | Pages read and products collected per store (defaults 20 and 50). |
 | `--max-per-collection` | Products taken from one collection page (default 10), so one big collection does not fill the sample. When every page is read and the sample is still under `--max-products`, it is topped up from the collection pages already read. |
@@ -78,7 +79,7 @@ venv\Scripts\python main.py --sites sites.txt --lang en
 | `--verbose` | Debug logging. |
 
 **`--ai` (optional).** Install [Ollama](https://ollama.com), run `ollama pull qwen2.5:7b`, and
-add `--ai`. For every store that was read, the local model writes key insights, recommendations
+add `--ai --ai-provider ollama`. For every store that was read, the local model writes key insights, recommendations
 and a brand-positioning paragraph; they appear in `report.md` under headings marked "(AI)". The
 model's text is in Chinese whatever `--lang` says. Nothing is sent to a cloud service. Without
 `--ai`, or when Ollama is not running (a warning says so), all text is rule-based and the

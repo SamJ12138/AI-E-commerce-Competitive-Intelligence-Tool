@@ -903,7 +903,29 @@ CONFIG_KEYS = {
     'render_js': False,
     'ignore_robots': False,
     'db_path': Config.db_path,
+    'ai_provider': None,
+    'ai_model': None,
 }
+
+
+def resolve_ai(ai: bool, provider: Optional[str], model: Optional[str], config_data: Dict):
+    """The AI provider object for --ai, or None when --ai is off. Exits 1 with one line when --ai is
+    given and ai_provider is unset or unusable (unknown name, missing API key)."""
+    if not ai:
+        return None
+    provider = provider or config_data.get('ai_provider')
+    model = model or config_data.get('ai_model')
+    if not provider:
+        click.echo("--ai needs a provider: set ai_provider (ollama or deepseek) in the config file "
+                   "or pass --ai-provider", err=True)
+        sys.exit(1)
+    from modules.ai_analyzer import make_provider
+    try:
+        return make_provider(str(provider), model)
+    except ValueError as e:
+        obs.swallowed("main.py:resolve_ai", error_type="input_invalid", fallback="exit 1", stage="load")
+        click.echo(str(e), err=True)
+        sys.exit(1)
 
 
 @click.command()
@@ -919,8 +941,12 @@ CONFIG_KEYS = {
 @click.option('--monitor', '-m', is_flag=True, default=False, help='Enable monitor mode for change detection')
 @click.option('--config', '-c', default=None, help='Path to config.yaml file')
 @click.option('--verbose', '-v', is_flag=True, default=False, help='Enable verbose logging')
-@click.option('--ai', is_flag=True, default=False, help='Run the LLM step: insights from a local Ollama model')
-@click.option('--ai-model', default='qwen2.5:7b', help='Ollama model to use (default: qwen2.5:7b)')
+@click.option('--ai', is_flag=True, default=False,
+              help='Run the LLM step with the provider set by ai_provider / --ai-provider')
+@click.option('--ai-provider', type=click.Choice(['ollama', 'deepseek']), default=None,
+              help='LLM provider for --ai (config key ai_provider; no default)')
+@click.option('--ai-model', default=None,
+              help='Model for --ai (default: qwen2.5:7b for ollama, deepseek-chat for deepseek)')
 @click.option('--lang', '-l', type=click.Choice(['en', 'zh']), default='zh', help='Report language: en=English, zh=Chinese (default)')
 def main(
     sites: str,
@@ -935,12 +961,13 @@ def main(
     config: Optional[str],
     verbose: bool,
     ai: bool,
-    ai_model: str,
+    ai_provider: Optional[str],
+    ai_model: Optional[str],
     lang: str
 ):
     """
     E-commerce Competitive Intelligence Tool
-    
+
     Analyzes e-commerce sites and generates Chinese merchant-ready intelligence reports.
     """
     # A console on a legacy code page (cp1252, gbk, ...) cannot encode every character printed
@@ -948,6 +975,10 @@ def main(
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
+    # Checked before anything is printed or fetched: --ai without a usable provider stops here.
+    provider = resolve_ai(ai, ai_provider, ai_model, load_config(config))
+    if provider is not None:
+        ai_provider, ai_model = provider.name, provider.model
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
     obs.init_run()
@@ -959,8 +990,8 @@ def main(
     t_load = obs.begin("load", sites_file=sites, outdir=outdir, render_js=render_js,
                        ignore_robots=ignore_robots, timeout=timeout, max_products=max_products,
                        max_per_collection=max_per_collection,
-                       max_pages=max_pages, monitor=monitor, config=config, ai=ai, ai_model=ai_model,
-                       lang=lang)
+                       max_pages=max_pages, monitor=monitor, config=config, ai=ai, ai_provider=ai_provider,
+                       ai_model=ai_model, lang=lang)
     import modules as modules_pkg
     if not modules_pkg.AI_AVAILABLE:
         obs.degraded("modules/__init__.py:<import>", "unknown", "ai_analyzer import failed",
@@ -1001,20 +1032,20 @@ def main(
 
     # Initialize AI analyzer if enabled
     ai_analyzer = None
-    if ai:
+    if provider is not None:
         try:
             from modules.ai_analyzer import AIAnalyzer, AIConfig
-            ai_config = AIConfig(ollama_model=ai_model)
-            ai_analyzer = AIAnalyzer(ai_config)
+            ai_analyzer = AIAnalyzer(AIConfig(provider=ai_provider, model=ai_model), provider=provider)
 
             if ai_analyzer.is_ai_available():
-                console.print(f"[green]✓ AI Analysis enabled ({ai_model})[/green]")
+                console.print(f"[green]✓ AI Analysis enabled ({ai_provider}, {ai_model})[/green]")
             else:
-                obs.degraded("main.py:main", "external_api", "--ai given but Ollama/model unavailable",
+                obs.degraded("main.py:main", "external_api", f"--ai given but {ai_provider}/model unavailable",
                              fallback="AI stage skipped for every site", stage="ai")
-                console.print(f"[yellow]⚠ AI requested but Ollama not available[/yellow]")
-                console.print("  Start Ollama: ollama serve")
-                console.print(f"  Pull model: ollama pull {ai_model}")
+                console.print(f"[yellow]⚠ AI requested but {ai_provider} not available[/yellow]")
+                if ai_provider == "ollama":
+                    console.print("  Start Ollama: ollama serve")
+                    console.print(f"  Pull model: ollama pull {ai_model}")
                 ai_analyzer = None
         except ImportError as e:
             obs.swallowed("main.py:main", error_type="unknown", fallback="AI stage skipped", stage="ai")
@@ -1198,7 +1229,7 @@ def main(
                     "business_report",
                     run_info={'ignore_robots': app_config.ignore_robots, 'render_js': app_config.render_js,
                               'ai_requested': ai, 'ai_available': ai_analyzer is not None,
-                              'ai_model': ai_model},
+                              'ai_provider': ai_provider, 'ai_model': ai_model},
                 )
                 console.print(f"  📈 Business Report: {business_path}")
                 obs.event("report", "success", kind="written", files=[business_path],

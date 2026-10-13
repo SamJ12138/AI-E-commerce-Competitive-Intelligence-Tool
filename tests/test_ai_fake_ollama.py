@@ -55,8 +55,8 @@ def ai_run(tmp_path_factory):
     servers = [StoreServer(name).start() for name in ("shopify_basic", "blocked")]
     try:
         (out / "sites.txt").write_text("".join(s.base_url + "\n" for s in servers), encoding="utf-8")
-        (out / "config.yaml").write_text(f"rate_limit_delay: 0\ndb_path: {(out / 'intel.db').as_posix()}\n",
-                                         encoding="utf-8")
+        (out / "config.yaml").write_text(f"rate_limit_delay: 0\nai_provider: ollama\n"
+                                         f"db_path: {(out / 'intel.db').as_posix()}\n", encoding="utf-8")
         env = dict(os.environ, ECI_LOG_DIR=str(out / "logs"), PYTHONIOENCODING="utf-8", FAKE_MODEL=MODEL,
                    FAKE_OLLAMA_LOG=str(out / "ollama_calls.json"), FAKE_INSIGHTS=INSIGHTS,
                    FAKE_POSITIONING=POSITIONING)

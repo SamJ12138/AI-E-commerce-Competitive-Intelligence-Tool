@@ -24,7 +24,8 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ERROR_TYPES = ["input_invalid", "http", "blocked", "parse", "timeout", "external_api", "unknown"]
+ERROR_TYPES = ["input_invalid", "http", "blocked", "parse", "timeout", "external_api", "auth", "rate_limit",
+               "unknown"]
 
 
 def load_events(paths):

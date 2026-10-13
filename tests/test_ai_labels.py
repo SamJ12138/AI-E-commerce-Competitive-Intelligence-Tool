@@ -54,10 +54,10 @@ def test_llm_output_is_labelled_with_the_model(tmp_path):
 
 def test_analyzer_returns_llm_output_only_and_no_pricing_or_threat(monkeypatch):
     from modules import ai_analyzer
-    monkeypatch.setattr(ai_analyzer.OllamaClient, "is_available", lambda self: True)
-    monkeypatch.setattr(ai_analyzer.OllamaClient, "generate",
+    monkeypatch.setattr(ai_analyzer.OllamaProvider, "is_available", lambda self: True)
+    monkeypatch.setattr(ai_analyzer.LLMClient, "generate",
                         lambda self, prompt, system=None: "## 关键洞察\n- one\n- two\n## 可复制的动作建议\n- act")
-    results = ai_analyzer.AIAnalyzer(ai_analyzer.AIConfig(ollama_model="m:1")).analyze_site(_intel().to_dict())
+    results = ai_analyzer.AIAnalyzer(ai_analyzer.AIConfig(provider="ollama", model="m:1")).analyze_site(_intel().to_dict())
     assert results["insights_from_llm"] and results["positioning_from_llm"]
     assert results["insights"]["key_insights"] == ["one", "two"]
     assert "pricing" not in results and "threat" not in results

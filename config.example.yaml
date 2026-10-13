@@ -32,3 +32,13 @@ ignore_robots: false
 
 # SQLite file where every scan is stored; --monitor compares a scan with the previous one here.
 db_path: data/intel_cache.db
+
+# LLM step (--ai). It runs only when --ai is given AND a provider is set here (or --ai-provider);
+# --ai without one stops with an error. ollama: a local model served by Ollama, nothing leaves
+# your machine. deepseek: DeepSeek's API (https://api.deepseek.com); the store data in the prompt
+# is sent to DeepSeek, and the key is read from DEEPSEEK_API_KEY (environment, else the
+# repository's .env file, which git ignores). Never put the key in this file.
+ai_provider:
+
+# Model for the provider (--ai-model). Empty: qwen2.5:7b for ollama, deepseek-chat for deepseek.
+ai_model:
